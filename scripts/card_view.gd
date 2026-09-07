@@ -9,7 +9,7 @@ const RED := Color("b24632")
 const COPPER := Color("bd9563")
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(100, 144)
+	custom_minimum_size = Vector2(76, 114)
 	resized.connect(queue_redraw)
 	tooltip_text = "Face-down play pile" if face_down else BurnsDeck.card_name(card_id)
 
@@ -38,8 +38,8 @@ func _draw() -> void:
 	var font := ThemeDB.fallback_font
 	draw_string(font, Vector2(10, 26), BurnsDeck.rank_text(card_id), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, color)
 	draw_string(font, Vector2(size.x - 27, size.y - 11), BurnsDeck.rank_text(card_id), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, color)
-	_draw_suit(suit, size / 2, minf(size.x * 0.24, 26), color)
-	_draw_suit(suit, Vector2(18, 41), 6, color)
+	_draw_suit([0, 1, 4, 3][suit], size / 2, minf(size.x * 0.24, 26), color)
+	_draw_suit([0, 1, 4, 3][suit], Vector2(18, 41), 6, color)
 
 func _draw_suit(suit: int, center: Vector2, radius: float, color: Color) -> void:
 	match suit:

@@ -2,9 +2,9 @@ extends SceneTree
 
 func _init() -> void:
 	var deck := BurnsDeck.create_deck()
-	assert(deck.size() == 78)
+	assert(deck.size() == 52)
 	assert(BurnsDeck.card_name(0) == "A of Diamonds")
-	assert(BurnsDeck.card_name(77) == "K of Dice")
+	assert(BurnsDeck.card_name(51) == "K of Spades")
 	for player_count in range(2, 9):
 		for seed_value in range(40):
 			var state := BurnsDeck.deal(player_count, seed_value)
@@ -14,7 +14,7 @@ func _init() -> void:
 			for row in state.rows:
 				assert(row.size() == 1)
 				seen.append_array(row)
-			var smallest := 78
+			var smallest := 52
 			var largest := 0
 			for player in state.players:
 				assert(player.discard.is_empty())

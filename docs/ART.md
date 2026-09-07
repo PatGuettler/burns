@@ -1,5 +1,15 @@
 # Art provenance
 
+## Standard-deck revision (current)
+
+`assets/art/card_room_standard.png` is the current background, edited with the built-in image generator from the original illustration. Hearts, diamonds, clubs, and spades replace the six-suit props. The original remains archived below. `assets/art/icon.svg` is an original code-native app mark extending the ivory-card and copper-ember visual system.
+
+Exact edit prompt:
+
+Use case: precise-object-edit
+Asset type: original Burns card game title background, updated to standard 52-card deck.
+Primary request: Preserve this illustration's midnight teal felt, walnut edges, warm copper engravings, ivory cards, painterly texture, lighting, composition, and the mostly empty left two thirds. Replace the cherry motifs on the decorative cards with classic red heart and red diamond motifs, and replace the loose cherries and dice props with a few small decorative ivory playing cards showing black clubs and spades. Keep the elegant restrained ember flecks and the same original art style. No cherries, no dice, no text, no letters, no numbers, no watermark. All changes should be confined to the card motifs and props on the right third; preserve the empty felt area for menu text.
+
 ## Card room
 
 - Asset: `assets/art/card_room.png`

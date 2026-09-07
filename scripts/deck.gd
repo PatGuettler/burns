@@ -2,9 +2,9 @@ class_name BurnsDeck
 extends RefCounted
 ## Immutable card IDs: suit * 13 + rank - 1. Never store texture IDs as game state.
 
-const SUITS := ["Diamonds", "Clubs", "Cherries", "Spades", "Hearts", "Dice"]
-const SYMBOLS := ["♦", "♣", "●", "♠", "♥", "⚄"]
-const RED_SUITS := [0, 2, 4]
+const SUITS := ["Diamonds", "Clubs", "Hearts", "Spades"]
+const SYMBOLS := ["♦", "♣", "♥", "♠"]
+const RED_SUITS := [0, 2]
 
 static func rank_of(card: int) -> int:
 	return card % 13 + 1
@@ -21,7 +21,7 @@ static func card_name(card: int) -> String:
 
 static func create_deck() -> Array[int]:
 	var cards: Array[int] = []
-	for card in range(78):
+	for card in range(52):
 		cards.append(card)
 	return cards
 
@@ -46,4 +46,4 @@ static func deal(player_count: int, seed_value: int) -> Dictionary:
 	while not cards.is_empty():
 		players[recipient % player_count].play.append(cards.pop_back())
 		recipient += 1
-	return {"rows": rows, "foundations": [[], [], [], [], [], []], "players": players}
+	return {"rows": rows, "foundations": [[], [], [], []], "players": players}
