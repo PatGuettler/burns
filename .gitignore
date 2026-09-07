@@ -1,0 +1,7 @@
+.godot/
+build/
+export_credentials.cfg
+.DS_Store
+*.keystore
+*.p12
+*.mobileprovision
