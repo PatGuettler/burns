@@ -18,8 +18,13 @@ var handed_to := -1
 var bot_wait := 0.0
 var sound_on := true
 var player: AudioStreamPlayer
-var table_scroll: ScrollContainer
-var scroll_position := 0
+var rules_page := 0
+var row_inspection := -1
+var setup_mode := "local"
+var resizing := false
+var online_url := ""
+var online_name := ""
+var online_code := ""
 var settings := ConfigFile.new()
 var save_enabled := true
 var offline_mode := "local"
@@ -62,8 +67,9 @@ func _ready() -> void:
 	content = MarginContainer.new()
 	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right", "top", "bottom"]:
-		content.add_theme_constant_override("margin_" + side, 24)
+		content.add_theme_constant_override("margin_" + side, 16)
 	add_child(content)
+	resized.connect(_schedule_layout)
 	_show_menu()
 
 func _process(delta: float) -> void:
@@ -77,8 +83,6 @@ func _process(delta: float) -> void:
 		if not action.is_empty(): _act(action, seat)
 
 func _clear() -> void:
-	if table_scroll and is_instance_valid(table_scroll): scroll_position = table_scroll.scroll_vertical
-	table_scroll = null
 	for child in content.get_children():
 		content.remove_child(child)
 		child.queue_free()
@@ -99,19 +103,22 @@ func _paragraph(text: String, font_size := 18, color := MUTED) -> Label:
 func _button(text: String, action: Callable, primary := false) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(0, 52)
-	button.add_theme_font_size_override("font_size", 18)
+	button.clip_text = true
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	button.custom_minimum_size = Vector2(maxf(44, ThemeDB.fallback_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 24), 44)
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", 16)
 	button.add_theme_color_override("font_color", CREAM)
 	for key in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color("a34b32") if primary else Color("16383c")
+		style.bg_color = Color("b85637") if primary else Color(0.10, 0.23, 0.24, 0.46)
 		if key == "hover": style.bg_color = style.bg_color.lightened(0.15)
 		if key == "disabled": style.bg_color = Color("253335")
-		style.border_color = GOLD if key == "focus" else Color("7b7760")
-		style.set_border_width_all(2 if key == "focus" else 1)
-		style.set_corner_radius_all(8)
-		style.content_margin_left = 18
-		style.content_margin_right = 18
+		style.border_color = GOLD
+		style.set_border_width_all(2 if key == "focus" else 0)
+		style.set_corner_radius_all(28)
+		style.content_margin_left = 12
+		style.content_margin_right = 12
 		button.add_theme_stylebox_override(key, style)
 	button.pressed.connect(action)
 	return button
@@ -131,41 +138,43 @@ func _page(title: String) -> VBoxContainer:
 	var header := _flow(outer)
 	header.add_child(_button("‹ Home", _show_menu))
 	header.add_child(_label(title, 30))
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	outer.add_child(scroll)
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_theme_constant_override("separation", 16)
-	scroll.add_child(box)
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 14)
+	outer.add_child(box)
 	return box
 
 func _show_menu() -> void:
 	screen = "menu"
 	_clear()
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 16)
-	content.add_child(box)
-	box.add_child(_label("THE FAMILY CARD TABLE", 16, GOLD))
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(spacer)
-	box.add_child(_label("Burns", 92))
-	box.add_child(_paragraph("A little solitaire. A little rivalry.", 26, CREAM))
-	box.add_child(_paragraph("Play your cards. Watch the table.\nCatch the move they missed.", 20))
-	var actions := _flow(box)
-	actions.add_child(_button("Pass & play", func(): _setup("local"), true))
-	actions.add_child(_button("Play computers", func(): _setup("bots")))
-	actions.add_child(_button("Online table", _online_setup))
-	var extras := _flow(box)
-	if game or not room.is_empty() or FileAccess.file_exists(SAVE): extras.add_child(_button("Resume game", _resume))
-	extras.add_child(_button("How to play", _show_rules))
-	extras.add_child(_button("Sound: on" if sound_on else "Sound: off", _toggle_sound))
-	var bottom := Control.new()
-	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(bottom)
-	box.add_child(_paragraph(message if not message.is_empty() else "2–8 PLAYERS  /  52 CARDS  /  ONE SHARP EYE", 16, GOLD))
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	var landscape := bounds.y < 500 and bounds.x > 620
+	var menu_w := minf(420, bounds.x)
+	var title_y := 38.0 if landscape else clampf(bounds.y * 0.12, 36, 110)
+	layer.label_at("THE FAMILY CARD TABLE", Rect2(0, 0, bounds.x, 24), 13, GOLD)
+	layer.label_at("Burns", Rect2(0, title_y, bounds.x, 92), 76 if bounds.x < 600 else 88, CREAM)
+	layer.label_at("A little solitaire. A little rivalry.", Rect2(0, title_y + 96, minf(bounds.x, 520), 36), 18 if landscape else 20, MUTED)
+	var action_x := bounds.x * 0.53 if landscape else 0.0
+	if landscape: menu_w = bounds.x - action_x
+	var action_y := 40.0 if landscape else title_y + 154
+	var actions: Array = [["Pass & play  >", func(): _setup("local"), true], ["Play computers  >", func(): _setup("bots"), false], ["Online table  >", _online_setup, false]]
+	for i in range(actions.size()):
+		var item: Array = actions[i]
+		layer.place(_button(item[0], item[1], item[2]), Rect2(action_x, action_y + i * 56, menu_w, 48))
+	var extras_y := action_y + 176
+	var extras: Array = []
+	if game or not room.is_empty() or FileAccess.file_exists(SAVE): extras.append(["Resume", _resume])
+	extras.append(["Rules", _show_rules])
+	extras.append(["Sound on" if sound_on else "Sound off", _toggle_sound])
+	var ew := (menu_w - (extras.size() - 1) * 8) / extras.size()
+	for i in range(extras.size()):
+		layer.place(_button(extras[i][0], extras[i][1]), Rect2(action_x + i * (ew + 8), extras_y, ew, 44))
+	layer.label_at(message if not message.is_empty() else "2–8 PLAYERS  ·  52 CARDS  ·  ONE SHARP EYE", Rect2(0, bounds.y - 24, bounds.x, 24), 12, GOLD)
 
 func _toggle_sound() -> void:
 	sound_on = not sound_on
@@ -175,20 +184,25 @@ func _toggle_sound() -> void:
 
 func _setup(new_mode: String) -> void:
 	screen = "setup"
-	var box := _page("Gather your table")
-	box.add_child(_paragraph("Everyone takes a turn on this device." if new_mode == "local" else "You are Player 1. The other seats are computer opponents."))
-	var row := _flow(box)
-	row.add_child(_label("Number of players", 22))
-	var count := SpinBox.new()
-	count.min_value = 2
-	count.max_value = 8
-	count.value = player_count
-	count.custom_minimum_size = Vector2(130, 52)
-	count.value_changed.connect(func(value: float): player_count = int(value))
-	row.add_child(count)
-	box.add_child(_paragraph("Aces first, then rows, then opponents’ discards. Tap a card to select it, then tap its destination. Discard to end your turn; everyone else can call Burns or pass."))
-	box.add_child(_button("Deal a new game", func(): _new_game(new_mode), true))
-	if game or FileAccess.file_exists(SAVE): box.add_child(_paragraph("Dealing replaces the saved offline game."))
+	setup_mode = new_mode
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 90, 44))
+	layer.label_at("Gather your table", Rect2(102, 0, bounds.x - 102, 44), 23, GOLD)
+	var introduction := "Take turns on this device." if new_mode == "local" else "You are Player 1. Play against computer opponents."
+	var intro := _paragraph(introduction, 19, CREAM)
+	layer.place(intro, Rect2(0, 64, bounds.x, 52))
+	layer.place(_button("-", func(): player_count = maxi(2, player_count - 1); _setup(new_mode)), Rect2(bounds.x / 2 - 92, 124, 48, 48))
+	var count := layer.label_at(str(player_count), Rect2(bounds.x / 2 - 38, 124, 76, 48), 34, GOLD)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.place(_button("+", func(): player_count = mini(8, player_count + 1); _setup(new_mode)), Rect2(bounds.x / 2 + 44, 124, 48, 48))
+	var description := _paragraph("Aces first, then rows, then opponents’ discards. Tap a card and its destination. Discard to end your turn; everyone else can call Burns or pass.", 17 if bounds.y > 440 else 14)
+	layer.place(description, Rect2(0, 196, bounds.x, bounds.y - 262))
+	layer.place(_button("Deal a new game", func(): _new_game(new_mode), true), Rect2(0, bounds.y - 48, bounds.x, 48))
 
 func _new_game(new_mode: String) -> void:
 	net.disconnect_room()
@@ -202,7 +216,6 @@ func _new_game(new_mode: String) -> void:
 	handed_to = -1
 	selected = {}
 	message = ""
-	scroll_position = 0
 	_save()
 	_show_table()
 
@@ -231,152 +244,57 @@ func _show_table() -> void:
 		_handoff(actor)
 		return
 	_clear()
-	var outer := VBoxContainer.new()
-	outer.add_theme_constant_override("separation", 10)
-	content.add_child(outer)
-	var header := _flow(outer)
-	header.add_child(_button("‹ Home", _show_menu))
-	header.add_child(_label("Burns", 32, GOLD))
-	header.add_child(_label("Turn %d · %s" % [state.turn, state.players[state.active].name], 22))
-	header.add_child(_button("Rules", _show_rules))
-	if mode == "online": header.add_child(_label("Room " + str(room.get("room", "")), 17, MUTED))
-	var status := ""
-	match state.phase:
-		"turn": status = "%s: select a card, then its destination." % state.players[state.active].name
-		"review": status = "Turn ended. %s: call Burns or pass." % state.players[actor].name
-		"penalty": status = "%s is burnt. %s: choose a penalty card." % [state.players[state.burnt].name, state.players[actor].name]
-		"finished": status = "%s wins! Every card is gone." % state.players[state.winner].name
-	outer.add_child(_paragraph(status, 21, CREAM))
-	if not message.is_empty(): outer.add_child(_paragraph(message, 17, GOLD))
-	if mode == "online":
-		for seat in room.get("seats", []):
-			if not seat.connected: outer.add_child(_paragraph("Paused · waiting for %s to reconnect." % seat.name, 18, GOLD))
-		if not net.connected: outer.add_child(_button("Reconnect", _reconnect, true))
-	table_scroll = ScrollContainer.new()
-	table_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	table_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	outer.add_child(table_scroll)
-	var board := VBoxContainer.new()
-	board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	board.add_theme_constant_override("separation", 16)
-	table_scroll.add_child(board)
-	board.add_child(_label("01   ACES FIRST", 15, GOLD))
-	var foundations := _flow(board)
-	for suit in range(4):
-		var column := VBoxContainer.new()
-		foundations.add_child(column)
-		column.add_child(_label(BurnsDeck.SUITS[suit], 16))
-		var pile: Array = state.foundations[suit]
-		if pile.is_empty():
-			var slot := _button("A\n" + BurnsDeck.SYMBOLS[suit], func(): _target("foundation", suit))
-			slot.custom_minimum_size = Vector2(76, 114)
-			column.add_child(slot)
-		else: _card(column, int(pile.back()), func(): _target("foundation", suit), {}, false, 114)
-	board.add_child(_label("02   FIVE ROWS · DOWN, ALTERNATING COLORS", 15, GOLD))
-	var rows := _flow(board)
-	for index in range(5):
-		var column := VBoxContainer.new()
-		column.add_theme_constant_override("separation", 4)
-		rows.add_child(column)
-		var destination := _button(str(index + 1), func(): _target("row", index))
-		destination.custom_minimum_size.x = 76
-		column.add_child(destination)
-		var pile: Array = state.rows[index]
-		if pile.is_empty():
-			var slot := _button("+", func(): _target("row", index))
-			slot.custom_minimum_size = Vector2(76, 114)
-			column.add_child(slot)
-		else:
-			# Overlap sequences while keeping every rank tappable and keyboard reachable.
-			var stack := Control.new()
-			stack.custom_minimum_size = Vector2(76, 114 + (pile.size() - 1) * 42)
-			column.add_child(stack)
-			for offset in range(pile.size()):
-				var source := {"source": "row", "index": index, "offset": offset}
-				var button := _card(stack, int(pile[offset]), func(): _select_or_target(source, "row", index), source, false, 114)
-				button.position.y = offset * 42
-	board.add_child(_label("03   THE PLAYERS · DISCARD UP OR DOWN", 15, GOLD))
-	var seats := _flow(board)
-	for i in range(state.players.size()):
-		var p: Dictionary = state.players[i]
-		var column := VBoxContainer.new()
-		column.custom_minimum_size.x = 184
-		seats.add_child(column)
-		var total := int(p.play_count + p.discard_count + p.reserve_count) + (1 if p.held >= 0 else 0)
-		column.add_child(_label("%s · %d" % [p.name, total], 18, GOLD if i == state.active else CREAM))
-		var piles := HBoxContainer.new()
-		piles.add_theme_constant_override("separation", 8)
-		column.add_child(piles)
-		if p.play_count > 0:
-			_card(piles, 0, func(): _pile_action(i, "play"), {}, true, 114)
-		else:
-			var empty := _button("—", func(): _pile_action(i, "play"))
-			empty.custom_minimum_size = Vector2(76, 114)
-			piles.add_child(empty)
-		if p.discard_top >= 0:
-			var source := {"source": "discard", "index": i, "offset": 0}
-			_card(piles, int(p.discard_top), func(): _pile_action(i, "discard"), source, false, 114)
-		else:
-			var empty := _button("Discard", func(): _pile_action(i, "discard"))
-			empty.custom_minimum_size = Vector2(76, 114)
-			piles.add_child(empty)
-		column.add_child(_label("%d hidden · %d discarded" % [p.play_count, p.discard_count], 14, MUTED))
-		if p.reserve_count > 0:
-			column.add_child(_label("Open pile · %d cards" % p.reserve_count, 15, GOLD))
-			var source := {"source": "reserve", "index": i, "offset": 0}
-			_card(column, int(p.reserve_top), func(): _pile_action(i, "reserve"), source, false, 114)
-			if i == state.active and state.phase == "turn" and _can_act():
-				column.add_child(_button("Reveal bottom", func(): _act({"type": "draw", "source": "bottom"})))
-		if p.held >= 0:
-			column.add_child(_label("Revealed card", 15, GOLD))
-			var source := {"source": "held", "index": 0, "offset": 0}
-			_card(column, int(p.held), func(): _select(source), source, false, 114)
-	var log_box := VBoxContainer.new()
-	board.add_child(log_box)
-	log_box.add_child(_label("AT THE TABLE", 15, GOLD))
-	for entry in state.log.slice(maxi(0, state.log.size() - 4)):
-		log_box.add_child(_paragraph(str(entry), 16))
-	var controls := _flow(outer)
-	if _can_act():
-		match state.phase:
-			"turn":
-				controls.add_child(_button("Reveal top card", func(): _act({"type": "draw"})))
-				controls.add_child(_button("Discard / end turn", func(): _act({"type": "end"}), true))
-				if mode != "online": controls.add_child(_button("Hint", _hint))
-				if not selected.is_empty(): controls.add_child(_button("Cancel selection", func(): selected = {}; _show_table()))
-			"review":
-				controls.add_child(_button("Call BURNS", func(): _act({"type": "burn"}), true))
-				controls.add_child(_button("Pass · no challenge", func(): _act({"type": "pass"})))
-			"penalty":
-				for source in ["play", "discard", "reserve"]:
-					if state.players[actor][source + "_count"] > 0:
-						controls.add_child(_button("Give " + {"play": "hidden top", "discard": "discard top", "reserve": "open-pile top"}[source], func(): _act({"type": "donate", "source": source}), true))
-	if state.phase == "finished": controls.add_child(_button("Back to the card room", _show_menu, true))
-	if table_scroll: table_scroll.set_deferred("scroll_vertical", scroll_position)
+	var table := BurnsTableView.new()
+	content.add_child(table)
+	table.build(self, size - Vector2(32, 32))
 
-func _card(parent: Node, id: int, action: Callable, source: Dictionary, back := false, height := 114) -> Button:
-	var button := Button.new()
-	button.custom_minimum_size = Vector2(76, height)
-	button.size = button.custom_minimum_size
-	button.clip_contents = false
-	button.tooltip_text = "Hidden play pile" if back else BurnsDeck.card_name(id)
-	button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
-	var art := BurnsCardView.new()
-	art.card_id = id
-	art.face_down = back
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	button.add_child(art)
-	if not source.is_empty() and source == selected:
-		art.modulate = Color("ffe49c")
-	button.pressed.connect(action)
-	parent.add_child(button)
-	return button
+func _inspect_row(row: int) -> void:
+	if state.is_empty(): return
+	screen = "row"
+	row_inspection = row
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	layer.state = state
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	layer.place(_button("‹ Table", _show_table), Rect2(0, 0, 110, 44))
+	layer.label_at("Row %d · choose a sequence" % (row + 1), Rect2(118, 0, bounds.x - 118, 44), 18, GOLD)
+	var pile: Array = state.rows[row]
+	var columns := 4 if bounds.x < 600 else 7
+	var rows := maxi(1, int(ceil(float(pile.size()) / columns)))
+	var cell := Vector2(bounds.x / columns, (bounds.y - 68) / rows)
+	var ch := minf(cell.y - 12, (cell.x - 12) * 1.48)
+	var cw := ch / 1.48
+	for offset in range(pile.size()):
+		var source := {"source": "row", "index": row, "offset": offset}
+		var rect := Rect2((offset % columns) * cell.x + (cell.x - cw) / 2, 60 + (offset / columns) * cell.y, cw, ch)
+		layer._card(rect, int(pile[offset]), func():
+			selected = source
+			message = "Sequence selected · tap a destination"
+			_show_table(), source)
+
+func _schedule_layout() -> void:
+	if resizing or not content: return
+	resizing = true
+	call_deferred("_relayout")
+
+func _relayout() -> void:
+	resizing = false
+	match screen:
+		"game": _show_table()
+		"menu": _show_menu()
+		"rules": _show_rules()
+		"setup": _setup(setup_mode)
+		"row": _inspect_row(row_inspection)
+		"lobby": _lobby()
+		"online": _online_setup()
 
 func _select(source: Dictionary) -> void:
 	if not _can_act() or state.phase != "turn": return
 	selected = source
-	message = "Card selected. Tap an Ace pile, row heading, or another player's discard."
+	message = "Selected · tap a destination"
 	_show_table()
 
 func _select_or_target(source: Dictionary, target: String, index: int) -> void:
@@ -413,6 +331,7 @@ func _act(action: Dictionary, seat := -1) -> void:
 		selected = {}
 		message = ""
 		state = game.view()
+		if action.get("type") == "draw": selected = {"source": "held", "index": 0, "offset": 0}
 		_save()
 		_tone(action.get("type") == "burn")
 	else: message = error
@@ -475,34 +394,49 @@ func _tone(burn := false) -> void:
 
 func _online_setup() -> void:
 	screen = "online"
-	var box := _page("An online table")
-	box.add_child(_paragraph("Create a private room or join friends using their room code. Everyone connects to the same Burns server."))
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	var compact := bounds.y < 500
+	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 90, 44))
+	layer.label_at("Online table", Rect2(102, 0, bounds.x - 102, 44), 24, GOLD)
+	layer.label_at("Use the same server as your friends.", Rect2(0, 56, bounds.x, 30), 16, MUTED)
+	if online_url.is_empty(): online_url = settings.get_value("network", "url", "ws://127.0.0.1:9080")
+	if online_name.is_empty(): online_name = settings.get_value("network", "name", "Player")
 	var url := LineEdit.new()
 	url.placeholder_text = "Server address (wss://…)"
-	url.text = settings.get_value("network", "url", "ws://127.0.0.1:9080")
-	url.custom_minimum_size.y = 52
-	box.add_child(url)
+	url.text = online_url
+	_style_input(url)
+	url.text_changed.connect(func(value: String): online_url = value)
+	layer.place(url, Rect2(0, 100, bounds.x, 46))
 	var name_field := LineEdit.new()
 	name_field.placeholder_text = "Your name"
-	name_field.text = settings.get_value("network", "name", "Player")
+	name_field.text = online_name
 	name_field.max_length = 24
-	name_field.custom_minimum_size.y = 52
-	box.add_child(name_field)
+	_style_input(name_field)
+	name_field.text_changed.connect(func(value: String): online_name = value)
+	layer.place(name_field, Rect2(0, 158, (bounds.x - 12) / 2 if compact else bounds.x, 46))
 	var code := LineEdit.new()
-	code.placeholder_text = "Room code · leave blank to create a room"
+	code.placeholder_text = "Room code (blank = new)"
+	code.text = online_code
 	code.max_length = 8
-	code.custom_minimum_size.y = 52
-	box.add_child(code)
-	box.add_child(_button("Take a seat", func():
+	_style_input(code)
+	code.text_changed.connect(func(value: String): online_code = value)
+	layer.place(code, Rect2((bounds.x + 12) / 2 if compact else 0.0, 158 if compact else 216, (bounds.x - 12) / 2 if compact else bounds.x, 46))
+	var button_y := 216.0 if compact else 278.0
+	layer.place(_button("Take a seat", func():
 		mode = "online"
-		settings.set_value("network", "url", url.text.strip_edges())
-		settings.set_value("network", "name", name_field.text.strip_edges())
+		settings.set_value("network", "url", online_url.strip_edges())
+		settings.set_value("network", "name", online_name.strip_edges())
 		settings.save("user://settings.cfg")
-		var error := net.connect_room(url.text.strip_edges(), name_field.text, code.text)
+		var error := net.connect_room(online_url.strip_edges(), online_name, online_code)
 		message = "Connecting…" if error == OK else "Could not connect: " + error_string(error)
-		_refresh(), true))
-	if not net.credentials.is_empty(): box.add_child(_button("Reconnect to previous seat", _reconnect))
-	box.add_child(_paragraph(message, 18, GOLD))
+		_refresh(), true), Rect2(0, button_y, bounds.x, 46))
+	if not net.credentials.is_empty(): layer.place(_button("Reconnect to previous seat", _reconnect), Rect2(0, button_y + 54, bounds.x, 44))
+	layer.label_at(message, Rect2(0, bounds.y - 24, bounds.x, 24), 14, GOLD)
 
 func _online_state(snapshot: Dictionary) -> void:
 	room = snapshot
@@ -517,17 +451,28 @@ func _online_state(snapshot: Dictionary) -> void:
 
 func _lobby() -> void:
 	screen = "lobby"
-	var box := _page("Your private table")
-	box.add_child(_label(str(room.get("room", "")), 48, GOLD))
-	box.add_child(_paragraph("Share this room code with your family. The host starts when everyone is here."))
-	for seat in room.get("seats", []):
-		box.add_child(_label("%s · %s" % [seat.name, "ready" if seat.connected else "reconnecting"], 22))
-	if local_seat == 0:
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 90, 44))
+	layer.label_at("Your private table", Rect2(102, 0, bounds.x - 102, 44), 22, GOLD)
+	layer.label_at(str(room.get("room", "")), Rect2(0, 54, bounds.x, 48), 40, GOLD)
+	layer.label_at("Share the code. The host starts the game.", Rect2(0, 108, bounds.x, 26), 15, MUTED)
+	var seats: Array = room.get("seats", [])
+	var columns := 4 if bounds.x > 600 else 2
+	for i in range(seats.size()):
+		var cell_w := bounds.x / columns
+		var label := _paragraph("%s\n%s" % [seats[i].name, "Ready" if seats[i].connected else "Reconnecting"], 16, CREAM)
+		layer.place(label, Rect2((i % columns) * cell_w, 152 + (i / columns) * 56, cell_w - 8, 50))
+	if not net.connected:
+		layer.place(_button("Reconnect", _reconnect, true), Rect2(0, bounds.y - 48, bounds.x, 48))
+	elif local_seat == 0:
 		var start := _button("Start game", func(): net.start_room(), true)
-		start.disabled = room.get("seats", []).size() < 2
-		box.add_child(start)
-	if not net.connected: box.add_child(_button("Reconnect", _reconnect))
-	box.add_child(_paragraph(message, 18, GOLD))
+		start.disabled = seats.size() < 2
+		layer.place(start, Rect2(0, bounds.y - 48, bounds.x, 48))
 
 func _reconnect() -> void:
 	var error := net.connect_room(net.current_url, "", "", true)
@@ -543,8 +488,7 @@ func _refresh() -> void:
 
 func _show_rules() -> void:
 	screen = "rules"
-	var box := _page("How to play Burns")
-	if not state.is_empty(): box.add_child(_button("Return to the table", _show_table, true))
+	_clear()
 	var sections := [
 		["01 · Make room at the table", "2–8 players share a standard 52-card deck. Five cards start face up as rows; the rest are dealt face down. The four Ace piles build upward, by suit, from Ace to King."],
 		["02 · Play in order", "Play to the Aces first, then the rows, then other players’ discards. Rows build down one rank in alternating colors. Move a card with the sequence below it onto a fitting row. Any card can fill an empty row. A row’s exposed last card can go to its Ace pile."],
@@ -555,6 +499,41 @@ func _show_rules() -> void:
 		["07 · Win the table", "Get rid of every personal card, including your discard and open pile. Victory is confirmed after the final Burns window and any penalties. You can also win by donating your last card."],
 		["A note about rearranging", "Splitting a row or moving it into an empty row is optional, so endless rearrangements cannot force a Burns. Moving a whole row onto a fitting occupied row frees a space and is required. Unrevealed cards never count as missed plays. Everyone passes explicitly; there is no reaction timer."],
 		["Controls", "Tap a card, then an Ace pile, row heading, or opponent discard. Tap a row card to move it with everything below. Keyboard: Tab to focus, Enter or Space to select. Offline games save after every action. Sound can be turned off on the home screen."]]
-	for section in sections:
-		box.add_child(_label(section[0], 23, GOLD))
-		box.add_child(_paragraph(section[1], 20, CREAM))
+	var section: Array = sections[rules_page]
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	layer.place(_button("‹ Back", _show_table if not state.is_empty() else _show_menu), Rect2(0, 0, 100, 44))
+	layer.label_at("How to play", Rect2(114, 0, bounds.x - 114, 44), 24, GOLD)
+	var title := _paragraph(section[0], 23, GOLD)
+	layer.place(title, Rect2(0, 64, bounds.x, 64))
+	var text := _paragraph(section[1], 19, CREAM)
+	var font := ThemeDB.fallback_font
+	var font_size := 21
+	var body_h := bounds.y - 192
+	while font_size > 13 and font.get_multiline_string_size(section[1], HORIZONTAL_ALIGNMENT_LEFT, bounds.x, font_size).y > body_h:
+		font_size -= 1
+	text.add_theme_font_size_override("font_size", font_size)
+	layer.place(text, Rect2(0, 128, bounds.x, body_h))
+	var bw := (bounds.x - 74) / 2
+	layer.place(_button("‹ Previous", func(): rules_page = (rules_page - 1 + sections.size()) % sections.size(); _show_rules()), Rect2(0, bounds.y - 44, bw, 44))
+	var count := layer.label_at("%d / %d" % [rules_page + 1, sections.size()], Rect2(bw + 6, bounds.y - 44, 62, 44), 16, GOLD)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.place(_button("Next ›", func(): rules_page = (rules_page + 1) % sections.size(); _show_rules(), true), Rect2(bounds.x - bw, bounds.y - 44, bw, 44))
+
+func _style_input(field: LineEdit) -> void:
+	field.custom_minimum_size.y = 46
+	field.context_menu_enabled = false
+	field.add_theme_font_size_override("font_size", 16)
+	field.add_theme_color_override("font_color", CREAM)
+	for key in ["normal", "focus", "read_only"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("153b40")
+		style.set_corner_radius_all(22)
+		style.content_margin_left = 12
+		style.content_margin_right = 12
+		style.set_border_width_all(1 if key == "focus" else 0)
+		style.border_color = GOLD
+		field.add_theme_stylebox_override(key, style)
