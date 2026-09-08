@@ -22,6 +22,8 @@ func run() -> void:
 		for count in [2, 4, 8]:
 			scene.player_count = count
 			scene._new_game("local")
+			await process_frame
+			_validate(scene, viewport_size)
 			scene.handed_to = 0
 			scene._show_table()
 			await process_frame
@@ -52,6 +54,11 @@ func run() -> void:
 		scene.room = {"room": "12345678", "seats": []}
 		for i in range(8): scene.room.seats.append({"name": "Player %d" % i, "connected": true})
 		scene._lobby()
+		await process_frame
+		_validate(scene, viewport_size)
+		scene.burn_title = "Burns confirmed"
+		scene.burn_explanation = "Player 2 called Burns. A higher-priority play was skipped. The Ace of Diamonds could play to the Aces area.\n\nPlayer 1 receives a card from every other player."
+		scene._show_burn_result()
 		await process_frame
 		_validate(scene, viewport_size)
 		for page in range(9):

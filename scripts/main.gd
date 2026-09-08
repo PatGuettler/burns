@@ -25,6 +25,8 @@ var resizing := false
 var online_url := ""
 var online_name := ""
 var online_code := ""
+var burn_title := ""
+var burn_explanation := ""
 var settings := ConfigFile.new()
 var save_enabled := true
 var offline_mode := "local"
@@ -288,6 +290,7 @@ func _relayout() -> void:
 		"rules": _show_rules()
 		"setup": _setup(setup_mode)
 		"row": _inspect_row(row_inspection)
+		"burn_result": _show_burn_result()
 		"lobby": _lobby()
 		"online": _online_setup()
 
@@ -312,13 +315,22 @@ func _pile_action(seat: int, source: String) -> void:
 	if source == "discard" and seat != state.active: _target("opponent", seat)
 	elif seat == state.active:
 		if source == "play": _act({"type": "draw"})
-		else: _select({"source": source, "index": seat, "offset": 0})
+		elif source == "discard" and selected.get("source") == "held": _act({"type": "end"})
+		elif state.players[seat][source + "_count"] > 0: _select({"source": source, "index": seat, "offset": 0})
 
 func _handoff(actor: int) -> void:
-	var box := _page("Pass the table")
-	box.add_child(_label(state.players[actor].name, 46, GOLD))
-	box.add_child(_paragraph("Your cards are waiting. Take the device, then begin your turn. The next hidden card stays covered until you choose to reveal it.", 23))
-	box.add_child(_button("I'm ready", func(): handed_to = actor; _show_table(), true))
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	layer.place(_button("‹ Home", _show_menu), Rect2(0, 0, 96, 44))
+	layer.label_at("Pass the table", Rect2(108, 0, bounds.x - 108, 44), 23, GOLD)
+	layer.label_at(state.players[actor].name, Rect2(0, 64, bounds.x, 56), 38, GOLD)
+	var text := _paragraph("Take the device, then begin your turn. Your next hidden card stays covered until you choose to reveal it.", 21 if bounds.y > 500 else 17, CREAM)
+	layer.place(text, Rect2(0, 136, bounds.x, bounds.y - 200))
+	layer.place(_button("I'm ready", func(): handed_to = actor; _show_table(), true), Rect2(0, bounds.y - 48, bounds.x, 48))
 
 func _act(action: Dictionary, seat := -1) -> void:
 	if seat == -1: seat = local_seat if mode == "online" else _actor()
@@ -335,7 +347,10 @@ func _act(action: Dictionary, seat := -1) -> void:
 		_save()
 		_tone(action.get("type") == "burn")
 	else: message = error
-	_show_table()
+	if error.is_empty() and action.get("type") == "burn":
+		_prepare_burn_result()
+	else:
+		_show_table()
 
 func _hint() -> void:
 	var available := game.moves().filter(func(m: Dictionary): return not m.optional)
@@ -439,6 +454,8 @@ func _online_setup() -> void:
 	layer.label_at(message, Rect2(0, bounds.y - 24, bounds.x, 24), 14, GOLD)
 
 func _online_state(snapshot: Dictionary) -> void:
+	var previous_phase: String = state.get("phase", "")
+	var keep_result := screen == "burn_result"
 	room = snapshot
 	local_seat = int(snapshot.seat)
 	settings.set_value("network", "credentials", net.credentials)
@@ -447,6 +464,8 @@ func _online_state(snapshot: Dictionary) -> void:
 	selected = {}
 	message = ""
 	if state.is_empty(): _lobby()
+	elif keep_result: _show_burn_result()
+	elif previous_phase == "review" and state.phase == "penalty": _prepare_burn_result()
 	else: _show_table()
 
 func _lobby() -> void:
@@ -537,3 +556,21 @@ func _style_input(field: LineEdit) -> void:
 		style.set_border_width_all(1 if key == "focus" else 0)
 		style.border_color = GOLD
 		field.add_theme_stylebox_override(key, style)
+
+func _prepare_burn_result() -> void:
+	burn_title = "Burns confirmed" if state.burnt == state.active else "False call"
+	burn_explanation = "\n\n".join(PackedStringArray(state.log.slice(maxi(0, state.log.size() - 2))))
+	_show_burn_result()
+
+func _show_burn_result() -> void:
+	screen = "burn_result"
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	layer.label_at(burn_title, Rect2(0, 12, bounds.x, 56), 34, GOLD)
+	var text := _paragraph(burn_explanation, 21 if bounds.y > 500 else 16, CREAM)
+	layer.place(text, Rect2(0, 88, bounds.x, bounds.y - 160))
+	layer.place(_button("Continue to the table", _show_table, true), Rect2(0, bounds.y - 48, bounds.x, 48))
