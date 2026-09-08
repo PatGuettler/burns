@@ -18,7 +18,7 @@ func build(owner_ui: Control, bounds: Vector2) -> void:
 	size = bounds
 	var w := bounds.x
 	var h := bounds.y
-	var wide := w >= 850 or (w / h > 1.55 and w > 620)
+	var wide := (w >= 850 and w / h >= 1.10) or (w / h > 1.55 and w > 620)
 	var small := h < 500
 	var header_h := 42.0
 	place(app._button("‹", app._show_menu), Rect2(0, 0, 44, header_h))

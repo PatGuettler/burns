@@ -46,6 +46,9 @@ func _ready() -> void:
 		var err := net.serve(port, address)
 		if err != OK: push_error("Cannot listen: %s" % error_string(err)); get_tree().quit(1)
 		return
+	_sync_display_density()
+	get_window().size_changed.connect(_sync_display_density)
+	_apply_ui_theme()
 	settings.load("user://settings.cfg")
 	sound_on = settings.get_value("audio", "enabled", true)
 	net.credentials = settings.get_value("network", "credentials", {})
@@ -574,3 +577,31 @@ func _show_burn_result() -> void:
 	var text := _paragraph(burn_explanation, 21 if bounds.y > 500 else 16, CREAM)
 	layer.place(text, Rect2(0, 88, bounds.x, bounds.y - 160))
 	layer.place(_button("Continue to the table", _show_table, true), Rect2(0, bounds.y - 48, bounds.x, 48))
+
+func _sync_display_density() -> void:
+	# Canvas dimensions are physical pixels on Retina/high-DPI screens. Layout uses
+	# logical pixels so a 3x phone still gets phone-sized cards and 44-point controls.
+	var density := maxf(1.0, DisplayServer.screen_get_scale())
+	if OS.get_name() == "Android": density = maxf(1.0, DisplayServer.screen_get_dpi() / 160.0)
+	elif OS.get_name() == "Windows": density = maxf(1.0, DisplayServer.screen_get_dpi() / 96.0)
+	var window := get_window()
+	var logical := Vector2i(Vector2(window.size) / density)
+	logical.x = maxi(1, logical.x)
+	logical.y = maxi(1, logical.y)
+	if window.content_scale_mode != Window.CONTENT_SCALE_MODE_CANVAS_ITEMS:
+		window.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_IGNORE
+	if window.content_scale_size != logical: window.content_scale_size = logical
+
+func _apply_ui_theme() -> void:
+	theme = Theme.new()
+	var tooltip := StyleBoxFlat.new()
+	tooltip.bg_color = Color("12383e")
+	tooltip.set_corner_radius_all(14)
+	tooltip.content_margin_left = 12
+	tooltip.content_margin_right = 12
+	tooltip.content_margin_top = 8
+	tooltip.content_margin_bottom = 8
+	theme.set_stylebox("panel", "TooltipPanel", tooltip)
+	theme.set_color("font_color", "TooltipLabel", CREAM)
+	theme.set_font_size("font_size", "TooltipLabel", 14)
