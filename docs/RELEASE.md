@@ -18,8 +18,8 @@ Version: 0.2.0. Engine: Godot 4.7.1. This is a playable development build.
 - Physical Android and iPhone/iPad testing: touch targets, density, notches/safe areas, orientation changes, background/resume, audio interruption, and low-memory behavior.
 - Safari/iOS browser validation, additional browsers, slow networks, and real cross-device games. Chromium and native resized windows do not substitute for physical-device testing.
 - Configure the iOS developer team, signing/provisioning, and Xcode export/build. No iOS build was validated in this Linux workspace.
-- Android release keystore and Gradle/AAB Play Store build, final bundle identifiers, versioning, store descriptions/screenshots, and submission requirements. The checked APK is debug-signed.
+- Finish the Play Console listing for `com.grapegames.burns` (paid, Contains ads = No): price, screenshots, Data safety, content rating, and internal testers. CI already signs a Gradle AAB and uploads it to the internal track once GitHub secrets and the Play app exist; see [docs/PLAY_ANDROID.md](PLAY_ANDROID.md).
 - Deploy and test a TLS room endpoint and HTTPS web host. Validate load, persistent storage permissions/backups, monitoring, and recovery for lost host credentials or abandoned seats.
 - Additional accessibility work: screen-reader integration for the custom-drawn board and user-adjustable text size. Keyboard focus, distinct suit shapes, labeled controls, and sound toggling are present, but this is not a full accessibility certification.
 
-No public server, store submission, analytics, ads, or payment system has been deployed.
+No public server, store listing, analytics, or ads have been deployed. Play uploads are paid and ad-free; in-app purchases are not used.

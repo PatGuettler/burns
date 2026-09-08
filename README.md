@@ -4,7 +4,7 @@ A family multiplayer solitaire game built in Godot 4.7.1 with GDScript. Version 
 
 The board adapts to portrait phones, landscape phones, and desktop windows. All five rows, opponents’ discard targets, the current hand, and turn controls stay on screen. Long rows open a card-selection grid; rules use pages. There are no scrollbars. Suit icons, card faces, card backs, and app branding are custom artwork, with no dependency on suit glyphs in the browser’s fonts.
 
-**This is a playable development build, not a store-ready release.** Web and Android test exports have succeeded. Physical Android/iOS device testing, iOS signing/build validation, production hosting, and store submissions remain.
+**This is a playable development build.** Web and Android test exports have succeeded. Google Play CI uploads a paid, ad-free AAB as `com.grapegames.burns` to the internal track; store listing, pricing, and physical-device testing still need to be finished. See [docs/PLAY_ANDROID.md](docs/PLAY_ANDROID.md).
 
 ## Play locally
 
@@ -57,7 +57,13 @@ godot --headless --path . --export-debug Android
 godot --headless --path . --export-release Linux
 ```
 
-Android requires configured SDK/JDK paths and matching templates. The APK at `build/android/burns.apk` is a debug-signed test build, not a Play Store submission. Android orientation follows the device. The iOS preset is included, but the developer team, provisioning, signing, and Xcode validation must be completed on macOS. Release packages use `com.patguettler.burns` as the provisional bundle identifier.
+Android requires configured SDK/JDK paths and matching templates. The **Android** preset writes a debug APK as `com.grapegames.burns.debug` (`build/android/Burns-debug.apk`). The Play Store identity is `com.grapegames.burns`; CI signs an AAB with the Grapegames release keystore and uploads it to the internal track. Local Play exports:
+
+```sh
+SKIP_DEBUG_APK=1 ./scripts/ci/godot-export-android.sh
+```
+
+Android orientation follows the device. The iOS preset uses `com.grapegames.burns`, but the developer team, provisioning, signing, and Xcode validation must be completed on macOS. Play Console steps, GitHub secrets, and the paid/no-ads listing checklist are in [docs/PLAY_ANDROID.md](docs/PLAY_ANDROID.md).
 
 ## Checks
 

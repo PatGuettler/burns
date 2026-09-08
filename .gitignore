@@ -3,5 +3,16 @@ build/
 export_credentials.cfg
 .DS_Store
 *.keystore
+*.jks
 *.p12
 *.mobileprovision
+*.apk
+*.aab
+*service-account*.json
+
+# Godot Android export template (generated locally and in CI).
+# Commit only the Play release overlay files under android/.
+/android/*
+!android/play-release.gradle
+!android/proguard-godot-play.pro
+!android/.build_version
