@@ -26,4 +26,4 @@ Primary request: An exquisite hand-painted overhead view of a midnight teal felt
 
 ## Playable card design
 
-`scripts/card_view.gd` draws ivory card faces, six distinct suit shapes, rank labels, and a copper radial back design. Cherries and dice are custom geometry, not font substitutions. Colors follow the supplied rules. These are original code-native assets; no external card pack or third-party art is used.
+`scripts/card_view.gd` draws ivory card faces, four active suit shapes, rank labels, and a copper radial back design. All suit symbols are drawn geometry, not font substitutions; this also avoids missing browser glyphs. Colors follow the supplied rules. These are original code-native assets; no external card pack or third-party art is used.

@@ -1,50 +1,87 @@
 # Burns
 
-An original family multiplayer solitaire game for Android, iOS, and web, built in Godot 4.7 with GDScript and the Compatibility renderer.
+A family multiplayer solitaire game built in Godot 4.7.1 with GDScript. Version 0.2 is playable with a standard 52-card deck, 2–8 players, pass-and-play, computer opponents, and private online rooms.
 
-**Status: design and deal preview, not a playable or production-ready release.** Open the project to explore the original illustrated title screen, six-suit cards, and deterministic table deals for 2–8 players. Gameplay implementation awaits clarification of the house rules in [docs/RULES.md](docs/RULES.md).
+The board adapts to portrait phones, landscape phones, and desktop windows. All five rows, opponents’ discard targets, the current hand, and turn controls stay on screen. Long rows open a card-selection grid; rules use pages. There are no scrollbars. Suit icons, card faces, card backs, and app branding are custom artwork, with no dependency on suit glyphs in the browser’s fonts.
 
-## Run
+**This is a playable development build, not a store-ready release.** Web and Android test exports have succeeded. Physical Android/iOS device testing, iOS signing/build validation, production hosting, and store submissions remain.
 
-Open `project.godot` in Godot 4.7.1 or run:
+## Play locally
+
+Open `project.godot` in Godot, or run:
 
 ```sh
 godot --path .
 ```
 
-## Verify
+Choose **Pass & play** or **Play computers**, select 2–8 players, and deal. Tap the hidden pile to reveal a card. The revealed card is selected automatically; tap its destination to play it. Tap a row card to select its sequence, or its card-count badge to inspect a long row. **Discard & end** ends the turn and opens the Burns window.
 
-```sh
-godot --headless --path . --editor --import --quit
-godot --headless --path . --script tests/test_deck.gd
-godot --headless --path . --script tests/test_ui.gd
-godot --headless --path . --quit-after 5
-```
+Everyone else calls **BURNS!** or **Pass**. The game explains the verdict, then each donor chooses a penalty card. Offline games save after every successful action. Return through **Resume**; dealing a new game replaces the offline save.
 
-The deck tests cover 280 seeded deals across all supported player counts, exact card conservation, balanced hands, repeatability, rank/suit naming, and invalid counts. These do not verify gameplay that has not been implemented.
+The confirmed rules and explicit edge-case choices are in [docs/RULES.md](docs/RULES.md).
 
-To export the web preview with the matching Godot export templates installed:
+## Web
+
+Install matching Godot export templates, then:
 
 ```sh
 mkdir -p build/web
+touch build/.gdignore
 godot --headless --path . --export-release Web
-python3 -m http.server 8000 --directory build/web
+python3 -m http.server 8000 --bind 127.0.0.1 --directory build/web
 ```
 
-Open `http://localhost:8000`. Browser/device validation is still required.
+Open `http://localhost:8000`. Do not open the HTML directly from disk. The web export is single-threaded and uses the Compatibility renderer.
 
-In this workspace, the editor inherits a Snap data directory while templates live in the standard user directory. Use `XDG_DATA_HOME=/home/pat/.local/share godot --headless --path . --export-release Web` if the default export reports missing templates.
+In this workspace, the editor inherits a Snap data directory while templates and Android settings live in the standard directories. Prefix exports with `XDG_DATA_HOME=/home/pat/.local/share XDG_CONFIG_HOME=/home/pat/.config` if templates or SDK settings are reported missing.
 
-## Design
+## Online rooms
 
-Midnight teal felt, warm ivory cards, copper engraving, and a restrained ember motif. Original raster illustration generated with the built-in image generator; suit symbols and card backs are drawn in GDScript to remain crisp at different resolutions. Art provenance and generation prompt are in [docs/ART.md](docs/ART.md).
+Run a room server:
 
-## Release work remaining
+```sh
+godot --headless --path . -- --server --port=9080
+```
 
-- Confirm house rules and deck variants; implement a deterministic rules engine and burn challenge state machine with scenario tests.
-- Implement selected play modes, turn privacy, tutorials, accessibility settings, audio, game persistence, and complete game UI.
-- If online play is selected: authoritative server validation, private room codes, reconnects, hidden-information views, latency-aware burn ordering, and integration tests. Do not send opponents’ hidden cards to clients.
-- Configure Android and iOS exports; test all exports on actual devices and browsers, portrait/landscape layouts, safe areas, background/resume behavior, and touch input.
-- Create final app icons, store artwork, signed builds, and required release metadata. iOS signing/build validation requires macOS and Xcode.
+In the game, choose **Online table**, enter `ws://127.0.0.1:9080`, choose a name, and leave the code blank to create a room. Friends on the same server enter the room code. The first player starts when everyone has joined.
 
-No online services, store releases, telemetry, or paid infrastructure are configured.
+For another device on your LAN, run the server with `--bind=0.0.0.0` and use the server computer’s LAN address. Internet/browser hosting requires a reachable HTTPS web host and a `wss://` room endpoint. No hosted service is provisioned; see [docs/ONLINE.md](docs/ONLINE.md).
+
+The server owns all hidden cards and adjudicates actions. Clients receive only exposed cards and pile counts. Rooms pause on disconnect; a reconnect key restores the same seat. Room state survives a server restart.
+
+## Native builds
+
+```sh
+mkdir -p build/android build/linux
+godot --headless --path . --export-debug Android
+godot --headless --path . --export-release Linux
+```
+
+Android requires configured SDK/JDK paths and matching templates. The APK at `build/android/burns.apk` is a debug-signed test build, not a Play Store submission. Android orientation follows the device. The iOS preset is included, but the developer team, provisioning, signing, and Xcode validation must be completed on macOS. Release packages use `com.patguettler.burns` as the provisional bundle identifier.
+
+## Checks
+
+```sh
+bash tools/check.sh
+```
+
+This imports scripts, checks for engine errors, and runs deck, rules, and responsive UI tests. Tests include 280 deals, 35 complete computer games, card conservation after every action, Burns/false-call cases, pile recycling, saves, and layout bounds at seven sizes from 320×568 to 1920×1080.
+
+Optional real WebSocket and Chromium integration tests:
+
+```sh
+python3 -m venv build/testenv
+build/testenv/bin/pip install -r tests/requirements.txt
+build/testenv/bin/playwright install chromium
+build/testenv/bin/python tests/test_network.py
+# The browser test starts its own local HTTP server:
+build/testenv/bin/python tests/test_browser.py
+```
+
+To render native screenshots:
+
+```sh
+godot --path . --audio-driver Dummy --script tests/test_ui.gd -- --screenshots
+```
+
+Screenshots and build outputs stay under ignored `build/`. Testing details and remaining release work are in [docs/RELEASE.md](docs/RELEASE.md). Original art provenance and exact image-generation prompts are in [docs/ART.md](docs/ART.md).

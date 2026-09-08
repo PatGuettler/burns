@@ -1,30 +1,39 @@
-# House rules specification
+# Burns rules
 
-## Supplied rules
+## Confirmed family rules
 
-- 2–8 players.
-- 78 cards: Ace through King in red diamonds, black clubs, red cherries, black spades, red hearts, black dice.
-- Six shared Ace areas, five shared rows, and a discard pile for each player.
-- Deal five cards face up. Deal the remaining cards face down without players looking.
-- Each player owns a face-down play pile and a discard pile.
-- Only the active player may inspect the top of their own play pile. They may play from that card or their discard pile.
-- Mandatory destination priority: Aces area, rows, other players’ discards.
-- Discarding a card believed unplayable ends a turn.
-- Any player may call Burns for a missed play, before the next player picks up a card.
-- An incorrect play may be challenged after the acting player releases it.
-- A correctly burnt player receives one card from every other player, from their play pile or discard, and puts those cards on the bottom of their face-down pile.
+- Start with one standard 52-card deck and 2–8 players. The six-suit deck is deferred.
+- Deal five cards face up into five shared rows, then deal the remaining cards face down to players as evenly as possible.
+- Four shared foundations build from Ace to King in the same suit.
+- Rows build downward by one rank in alternating colors. Move a card together with the valid sequence below it. Any card can fill an empty row. An exposed row card can move to its foundation.
+- Opponents’ discards build upward **or** downward by one rank in alternating colors.
+- Players may use their revealed play-pile top or their own discard top. No player may inspect a face-down card before their turn.
+- Destination priority is foundations, rows, then opponents’ discards.
+- Discarding ends a turn. Burns may only be called **after** the player finishes.
+- A missed required play burns the offender. An incorrect Burns call burns the caller instead.
+- Every other player gives the burnt player one card from their hidden top or discard top. Gifts go on the bottom of the burnt player’s hidden pile.
+- When the hidden pile empties, the discard stays in its existing order. The player can use its exposed top or reveal its bottom. Once a new discard is made, the remaining old pile becomes face down again.
+- Win by getting rid of **all** personal cards, including the play pile and discard.
 
-## Required clarification
+The example “red 3 with a black 3” is interpreted as “red 3 with a black 2,” consistent with descending alternating-color rows.
 
-1. Do Ace areas ascend by suit from Ace to King? Can row cards move to them, and must those moves also be made before drawing?
-2. Do rows build down in alternating colors, by suit, or another rule? Can sequences or entire rows move? What fills an empty row?
-3. How do other players’ discards build: one higher/lower, same suit, alternating color? Can Aces and Kings wrap?
-4. Does victory require emptying the play pile or both piles? Can a final move still be burnt before victory?
-5. Use the listed 78-card deck, standard 52-card decks at 3–4 players per deck, or selectable variants? How do duplicate suits affect Ace areas?
-6. What happens after a false burn? How are simultaneous callers resolved?
-7. After a burn, does the offender’s turn end or continue? Are incorrect moves reversed? In what order are penalty cards placed underneath? What if a donor has no cards?
-8. When a player’s play pile empties but their discard remains, do they flip the discard? How is an unplayable discard-only turn handled?
-9. Is the priority global across all available source cards or evaluated for the card being played?
-10. Which play modes are required: same-device pass-and-play, online private rooms, computer opponents?
+## Explicit implementation choices
 
-The initial preview implements only deck creation and initial dealing. No unconfirmed move rule is silently treated as authoritative.
+These resolve cases not fully specified in the conversation and can be adjusted after family playtesting:
+
+- The top of an array is its last element. An old discard becoming face down retains that order; its former top is the next hidden top. The bottom option reveals one card into the player’s hand before it can be played.
+- Empty opponent discards accept any card. Ace and King do not wrap. Shared rows cannot be transferred onto an opponent’s discard; that destination accepts personal cards only.
+- Priority is global across all exposed playable sources. A placement that fits can still skip a higher-priority move and become burnable. Structurally invalid placements are rejected immediately, with no card moved.
+- A whole row moving onto an occupied row frees a space and is a required move. Splitting a row or moving it to an empty row is optional; reversible rearrangements cannot create an endless requirement to move.
+- Only exposed cards count as missed plays. The remaining hidden play pile and the unseen bottom of an open pile never provide secret evidence for a Burns verdict.
+- The engine records missed opportunities immediately before discarding, plus any priority violation earlier in that turn. Review uses this recorded evidence, not the changed board after the discard.
+- Every other player must explicitly call Burns or pass before the next turn. There is no reaction timer. Online, the first valid challenge processed by the server resolves the window; stale competing actions are rejected.
+- After either a correct or false call, donors choose in clockwise order starting after the burnt player. Each gift is inserted at the bottom. A donor with no cards is skipped. An open-pile top is an available donation source.
+- A burn does not undo already legal card placements. After penalties, play advances to the next player.
+- A final empty hand still goes through the Burns window before victory is confirmed. A player can also empty their hand by donating a final card.
+
+## Engine states
+
+`turn → review → next turn` after all passes, or `turn → review → penalty → next turn` after a call. A confirmed empty hand changes the phase to `finished` instead of starting another turn.
+
+The client never decides the legality of an online action. The same `BurnsGame` engine powers offline play, computer opponents, and the room server. `view()` removes hidden pile arrays and private adjudication evidence from network snapshots.
