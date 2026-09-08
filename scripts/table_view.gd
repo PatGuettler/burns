@@ -93,13 +93,19 @@ func label_at(text: String, rect: Rect2, font_size := 15, color := CREAM) -> Lab
 	place(label, rect)
 	return label
 
-func _card(rect: Rect2, card: int, action: Callable, source := {}, back := false, empty := false, caption := "", suit_hint := -1, compact := false) -> Button:
-	var button := Button.new()
+func _card(rect: Rect2, card: int, action: Callable, source := {}, back := false, empty := false, caption := "", suit_hint := -1, compact := false) -> BurnsCardButton:
+	var button := BurnsCardButton.new()
+	button.table = self
+	button.source = source.duplicate()
+	button.draggable = not back and not empty and not source.is_empty()
+	if source.get("source") == "row": button.drop_target = {"kind": "row", "index": source.index}
+	if source.get("source") == "discard": button.drop_target = {"kind": "discard", "index": source.index}
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.tooltip_text = caption if empty or back else BurnsDeck.card_name(card)
 	for key in ["normal", "hover", "pressed", "disabled", "focus"]:
 		button.add_theme_stylebox_override(key, StyleBoxEmpty.new())
 	var art := BurnsCardView.new()
+	button.art = art
 	art.card_id = maxi(0, card)
 	art.face_down = back
 	art.empty_slot = empty
@@ -114,7 +120,8 @@ func _card(rect: Rect2, card: int, action: Callable, source := {}, back := false
 	button.focus_exited.connect(func(): art.focused = false; art.queue_redraw())
 	button.mouse_entered.connect(func(): art.hovered = true; art.queue_redraw())
 	button.mouse_exited.connect(func(): art.hovered = false; art.queue_redraw())
-	button.pressed.connect(action)
+	button.pressed.connect(func():
+		if not button.suppress_click and not get_viewport().gui_is_dragging(): action.call())
 	place(button, rect)
 	card_rects.append(rect)
 	card_sources.append(source.get("source", "other"))
@@ -128,7 +135,7 @@ func _foundations(area: Rect2) -> void:
 	for suit in range(4):
 		var pile: Array = state.foundations[suit]
 		var rect := Rect2(start + suit * (cw + gap), area.position.y, cw, ch)
-		_card(rect, int(pile.back()) if not pile.is_empty() else 0, func(): app._target("foundation", suit), {}, false, pile.is_empty(), "A", suit)
+		_card(rect, int(pile.back()) if not pile.is_empty() else 0, func(): app._target("foundation", suit), {}, false, pile.is_empty(), "A", suit).drop_target = {"kind": "foundation", "index": suit}
 	if area.size.x > 550:
 		label_at("ACES\nBY SUIT", Rect2(area.position.x, area.position.y, 90, area.size.y), 13, GOLD)
 
@@ -145,7 +152,7 @@ func _rows(area: Rect2) -> void:
 		var title := label_at("ROW %d" % (row + 1), Rect2(x, area.position.y, cw, 20), 11, GOLD)
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if pile.is_empty():
-			_card(Rect2(x, y, cw, ch), 0, func(): app._target("row", row), {}, false, true, "+")
+			_card(Rect2(x, y, cw, ch), 0, func(): app._target("row", row), {}, false, true, "+").drop_target = {"kind": "row", "index": row}
 			continue
 		var available := maxf(ch, area.size.y - 22)
 		var capacity := maxi(1, int((available - ch) / 23) + 1)
@@ -183,7 +190,7 @@ func _opponents(area: Rect2, columns: int) -> void:
 		var has_extra: bool = p.held >= 0 or p.reserve_top >= 0
 		if has_extra: cw = minf(cw, (cell.x - 12) / 2); ch = minf(ch, cw * 1.48)
 		var x := origin.x + (cell.x - cw * (2 if has_extra else 1) - (4 if has_extra else 0)) / 2
-		_card(Rect2(x, origin.y + 20, cw, ch), int(p.discard_top), func(): app._pile_action(seat, "discard"), {}, false, p.discard_top < 0, "+/-")
+		_card(Rect2(x, origin.y + 20, cw, ch), int(p.discard_top), func(): app._pile_action(seat, "discard"), {}, false, p.discard_top < 0, "+/-").drop_target = {"kind": "opponent", "index": seat}
 		if has_extra:
 			var exposed: int = p.held if p.held >= 0 else p.reserve_top
 			_card(Rect2(x + cw + 4, origin.y + 20, cw, ch), exposed, func(): app.message = "Only that player's discard is a destination."; app._show_table())
@@ -253,7 +260,7 @@ func _actions(area: Rect2, small: bool) -> void:
 func _compact_opponent(p: Dictionary, seat: int, area: Rect2) -> void:
 	var has_extra: bool = p.held >= 0 or p.reserve_top >= 0
 	var width := (area.size.x - 4) / 2 if has_extra else area.size.x
-	_card(Rect2(area.position, Vector2(width, area.size.y)), int(p.discard_top), func(): app._pile_action(seat, "discard"), {}, false, p.discard_top < 0, "+/-", -1, true)
+	_card(Rect2(area.position, Vector2(width, area.size.y)), int(p.discard_top), func(): app._pile_action(seat, "discard"), {}, false, p.discard_top < 0, "+/-", -1, true).drop_target = {"kind": "opponent", "index": seat}
 	if has_extra:
 		var card: int = p.held if p.held >= 0 else p.reserve_top
 		_card(Rect2(area.position.x + width + 4, area.position.y, width, area.size.y), card, func(): app.message = "Exposed card · only the discard is a destination"; app._show_table(), {}, false, false, "", -1, true)
@@ -283,3 +290,39 @@ func _compact_hand(area: Rect2) -> void:
 			else: app._pile_action(hand_seat, kind), source, back, card < 0 and not back, "—")
 		var label := label_at({"play": "Draw", "discard": "Discard", "reserve": "Open top", "held": "Play this"}[kind], Rect2(rect.position.x - 5, rect.end.y, cw + 10, 16), 11, MUTED)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+func drag_cards(source: Dictionary) -> Array:
+	if not source.has_all(["source", "index", "offset"]): return []
+	var p: Dictionary = state.players[state.active]
+	match source.source:
+		"row":
+			if source.index < 0 or source.index >= 5: return []
+			return state.rows[source.index].slice(source.offset)
+		"held": return [p.held] if p.held >= 0 else []
+		"discard", "reserve":
+			if source.index != state.active: return []
+			var top: int = p[source.source + "_top"]
+			return [top] if top >= 0 else []
+	return []
+
+func accepts_drop(data: Variant, target: Dictionary) -> bool:
+	if not data is Dictionary or not data.get("burns_drag", false) or target.is_empty(): return false
+	if data.get("table") != get_instance_id() or data.get("revision") != app.state.get("revision"): return false
+	if not app._can_act() or app.state.phase != "turn": return false
+	var source: Dictionary = data.source
+	var cards := drag_cards(source)
+	if cards.is_empty(): return false
+	var card: int = cards[0]
+	match target.kind:
+		"discard": return source.source == "held" and target.index == state.active
+		"foundation":
+			return cards.size() == 1 and BurnsDeck.suit_of(card) == target.index and state.foundations[target.index].size() == BurnsDeck.rank_of(card) - 1
+		"row":
+			if source.source == "row" and source.index == target.index: return false
+			var pile: Array = state.rows[target.index]
+			return pile.is_empty() or (BurnsGame.alternate(card, pile.back()) and BurnsDeck.rank_of(pile.back()) == BurnsDeck.rank_of(card) + 1)
+		"opponent":
+			if source.source == "row" or cards.size() != 1 or target.index == state.active: return false
+			var top: int = state.players[target.index].discard_top
+			return top < 0 or (BurnsGame.alternate(card, top) and absi(BurnsDeck.rank_of(card) - BurnsDeck.rank_of(top)) == 1)
+	return false
