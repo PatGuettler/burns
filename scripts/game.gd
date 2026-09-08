@@ -70,7 +70,7 @@ func moves() -> Array:
 			if seat == s.active:
 				continue
 			var discard: Array = s.players[seat].discard
-			if discard.is_empty() or (absi(BurnsDeck.rank_of(discard.back()) - rank) == 1 and alternate(card, discard.back())):
+			if not discard.is_empty() and (absi(BurnsDeck.rank_of(discard.back()) - rank) == 1 and alternate(card, discard.back())):
 				result.append(_move(source, "opponent", seat, 2))
 	return result
 
@@ -90,7 +90,9 @@ func act(seat: int, action: Dictionary) -> String:
 		return "This game has finished."
 	var error := ""
 	match str(action.get("type", "")):
-		"burn", "pass":
+		"burn":
+			error = _burn(seat)
+		"pass":
 			error = _review(seat, action.type)
 		"donate":
 			error = _donate(seat, str(action.get("source", "")))
@@ -192,32 +194,56 @@ func _review(seat: int, kind: String) -> String:
 		s.reviewers.erase(seat)
 		if s.reviewers.is_empty(): _next_turn()
 		return ""
-	var correct: bool = not s.missed.is_empty()
+	return "Unknown review action."
+
+func _burn(seat: int) -> String:
+	var eligible: bool = s.phase == "review" and seat in s.reviewers
+	var correct: bool = eligible and not s.missed.is_empty()
+	# A premature/late/self call is allowed, but false. Resume precisely where it interrupted.
+	if not eligible:
+		if not s.has("interrupts"): s.interrupts = []
+		s.interrupts.append({"phase": s.phase, "burnt": s.burnt, "donors": s.donors.duplicate(), "reviewers": s.reviewers.duplicate()})
+	s.burn_serial = int(s.get("burn_serial", 0)) + 1
+	s.burn_correct = correct
 	s.burnt = s.active if correct else seat
-	_log("%s called Burns. %s" % [s.players[seat].name, s.missed if correct else "False call: no playable move was missed."])
+	var reason: String = s.missed if correct else ("False call: no playable move was missed." if eligible else "False call: this is not an eligible end-of-turn challenge.")
+	_log("%s called Burns. %s" % [s.players[seat].name, reason])
 	_log("%s receives one card from each other player." % s.players[s.burnt].name)
 	s.donors = []
-	# Fixed clockwise donation order makes pile ordering deterministic across clients.
 	for offset in range(1, s.players.size()):
 		var donor: int = (s.burnt + offset) % s.players.size()
 		if remaining(donor) > 0: s.donors.append(donor)
 	s.phase = "penalty"
 	s.reviewers = []
-	if s.donors.is_empty(): _next_turn()
+	if s.donors.is_empty(): _finish_penalty()
 	return ""
+
+func _finish_penalty() -> void:
+	if not s.get("interrupts", []).is_empty():
+		var previous: Dictionary = s.interrupts.pop_back()
+		for key in previous: s[key] = previous[key]
+		# A nested penalty can exhaust a previously queued donor.
+		if s.phase == "penalty":
+			s.donors = s.donors.filter(func(seat: int): return remaining(seat) > 0)
+			if s.donors.is_empty(): _finish_penalty()
+	else:
+		_next_turn()
 
 func _donate(seat: int, source: String) -> String:
 	if s.phase != "penalty" or s.donors.is_empty() or s.donors[0] != seat:
 		return "Wait for your turn to give a penalty card."
 	var p: Dictionary = s.players[seat]
 	var card := -1
-	if source in ["play", "discard", "reserve"] and not p[source].is_empty():
+	if source == "held" and p.held >= 0:
+		card = p.held
+		p.held = -1
+	elif source in ["play", "discard", "reserve"] and not p[source].is_empty():
 		card = p[source].pop_back()
 	else:
 		return "Choose the top of a nonempty pile."
 	s.players[s.burnt].play.push_front(card)
 	s.donors.pop_front()
-	if s.donors.is_empty(): _next_turn()
+	if s.donors.is_empty(): _finish_penalty()
 	return ""
 
 func _next_turn() -> void:
@@ -241,6 +267,7 @@ func view() -> Dictionary:
 	var result := s.duplicate(true)
 	result.erase("missed")
 	for p in result.players:
+		p.held_count = 1 if p.held >= 0 else 0
 		p.play_count = p.play.size()
 		p.discard_count = p.discard.size()
 		p.reserve_count = p.reserve.size()
@@ -291,6 +318,15 @@ func restore(value: Variant) -> bool:
 		if not p.name is String or not p.held is int or p.held < -1 or p.held > 51: return false
 		for key in ["play", "discard", "reserve"]:
 			if not _valid_pile(p[key]): return false
+	if value.has("interrupts"):
+		if not value.interrupts is Array: return false
+		for context in value.interrupts:
+			if not context is Dictionary or context.keys().size() != 4 or not context.has_all(["phase", "burnt", "donors", "reviewers"]): return false
+			if context.phase not in ["turn", "review", "penalty"] or not context.burnt is int or context.burnt < -1 or context.burnt >= value.players.size(): return false
+			for key in ["donors", "reviewers"]:
+				if not context[key] is Array: return false
+				for seat in context[key]:
+					if not seat is int or seat < 0 or seat >= value.players.size(): return false
 	var previous := s
 	s = value.duplicate(true)
 	if not invariant():

@@ -22,10 +22,13 @@ func build(owner_ui: Control, bounds: Vector2) -> void:
 	var small := h < 500
 	var header_h := 42.0
 	place(app._button("‹", app._show_menu), Rect2(0, 0, 44, header_h))
-	label_at("Burns", Rect2(56, 0, 116, header_h), 30, GOLD)
+	label_at("Burns", Rect2(56, 0, 90, header_h), 26, GOLD)
 	var title := "TURN %d" % state.turn
 	if w > 540: title += "  ·  " + str(state.players[state.active].name)
-	label_at(title, Rect2(174, 0, maxf(20, w - 280), header_h), 13, MUTED)
+	if w > 500: label_at(title, Rect2(158, 0, w - 304, header_h), 13, MUTED)
+	var burn: Button = app._button("BURNS!", app._call_burn, true)
+	burn.disabled = not app._can_burn()
+	place(burn, Rect2(w - 136, 0, 84, header_h))
 	place(app._button("?", app._show_rules), Rect2(w - 44, 0, 44, header_h))
 	var actor: int = app._actor()
 	hand_seat = actor if app.mode == "local" and actor >= 0 else (app.local_seat if app.mode == "online" else 0)
@@ -237,12 +240,11 @@ func _actions(area: Rect2, small: bool) -> void:
 					items.append(["Cancel", func(): app.selected = {}; app._show_table(), false])
 				elif app.mode != "online": items.append(["Hint", app._hint, false])
 			"review":
-				items.append(["BURNS!", func(): app._act({"type": "burn"}), true])
 				items.append(["Pass", func(): app._act({"type": "pass"}), false])
 			"penalty":
-				for source in ["play", "discard", "reserve"]:
+				for source in ["play", "discard", "reserve", "held"]:
 					if state.players[app._actor()][source + "_count"] > 0:
-						items.append(["Give " + {"play": "hidden", "discard": "discard", "reserve": "open"}[source], func(): app._act({"type": "donate", "source": source}), true])
+						items.append(["Give " + {"play": "hidden", "discard": "discard", "reserve": "open", "held": "revealed"}[source], func(): app._act({"type": "donate", "source": source}), true])
 	if state.phase == "finished": items.append(["Back to the room", app._show_menu, true])
 	if app.mode == "online" and not app.net.connected: items = [["Reconnect", app._reconnect, true]]
 	if items.is_empty():
@@ -324,5 +326,5 @@ func accepts_drop(data: Variant, target: Dictionary) -> bool:
 		"opponent":
 			if source.source == "row" or cards.size() != 1 or target.index == state.active: return false
 			var top: int = state.players[target.index].discard_top
-			return top < 0 or (BurnsGame.alternate(card, top) and absi(BurnsDeck.rank_of(card) - BurnsDeck.rank_of(top)) == 1)
+			return top >= 0 and (BurnsGame.alternate(card, top) and absi(BurnsDeck.rank_of(card) - BurnsDeck.rank_of(top)) == 1)
 	return false

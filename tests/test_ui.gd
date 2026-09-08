@@ -28,6 +28,12 @@ func run() -> void:
 			scene._show_table()
 			await process_frame
 			_validate(scene, viewport_size)
+			check(scene._can_burn(), "Burns available during active turn")
+			scene._call_burn()
+			await process_frame
+			_validate(scene, viewport_size)
+			check(scene.screen == "burn_caller", "Shared device identifies caller")
+			scene._show_table()
 			scene._act({"type": "draw"})
 			await process_frame
 			_validate(scene, viewport_size)

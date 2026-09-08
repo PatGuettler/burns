@@ -294,6 +294,7 @@ func _relayout() -> void:
 		"setup": _setup(setup_mode)
 		"row": _inspect_row(row_inspection)
 		"burn_result": _show_burn_result()
+		"burn_caller": _call_burn()
 		"lobby": _lobby()
 		"online": _online_setup()
 
@@ -338,7 +339,7 @@ func _handoff(actor: int) -> void:
 func _act(action: Dictionary, seat := -1) -> void:
 	if seat == -1: seat = local_seat if mode == "online" else _actor()
 	if mode == "online":
-		if not _can_act(): return
+		if not (_can_burn() if action.get("type") == "burn" else _can_act()): return
 		net.send_action(action, int(state.revision))
 		return
 	var error := game.act(seat, action)
@@ -457,7 +458,7 @@ func _online_setup() -> void:
 	layer.label_at(message, Rect2(0, bounds.y - 24, bounds.x, 24), 14, GOLD)
 
 func _online_state(snapshot: Dictionary) -> void:
-	var previous_phase: String = state.get("phase", "")
+	var previous_burn: int = state.get("burn_serial", 0)
 	var keep_result := screen == "burn_result"
 	room = snapshot
 	local_seat = int(snapshot.seat)
@@ -467,8 +468,8 @@ func _online_state(snapshot: Dictionary) -> void:
 	selected = {}
 	message = ""
 	if state.is_empty(): _lobby()
+	elif int(state.get("burn_serial", 0)) > previous_burn: _prepare_burn_result()
 	elif keep_result: _show_burn_result()
-	elif previous_phase == "review" and state.phase == "penalty": _prepare_burn_result()
 	else: _show_table()
 
 func _lobby() -> void:
@@ -514,10 +515,10 @@ func _show_rules() -> void:
 	var sections := [
 		["01 · Make room at the table", "2–8 players share a standard 52-card deck. Five cards start face up as rows; the rest are dealt face down. The four Ace piles build upward, by suit, from Ace to King."],
 		["02 · Play in order", "Play to the Aces first, then the rows, then other players’ discards. Rows build down one rank in alternating colors. Move a card with the sequence below it onto a fitting row. Any card can fill an empty row. A row’s exposed last card can go to its Ace pile."],
-		["03 · Share the trouble", "Opponents’ discards build one rank up OR down, in alternating colors. An empty discard accepts any card. Ace and King do not wrap. Only your own discard is a source; opponents’ piles are destinations."],
+		["03 · Share the trouble", "Opponents’ discards build one rank up OR down, in alternating colors. An empty opponent discard cannot be played on. Ace and King do not wrap. Only your own discard is a source; opponents’ piles are destinations."],
 		["04 · Reveal, play, discard", "Only reveal your own top card on your turn. Play it, play from your discard, or move the rows. Discard the revealed card to end your turn. The game rejects placements that do not fit, but lets you miss plays or skip priority—watch for Burns."],
 		["05 · When the hidden pile runs out", "Your discard becomes an open pile, in the same order. Play its exposed top or reveal its bottom. When you discard again, the remaining open pile becomes face down, without shuffling; its former top is drawn next."],
-		["06 · Call Burns", "Only after the turn ends, each other player calls Burns or passes. A missed required play or skipped priority burns the player. A false call burns the caller instead. Every other player gives one card from their hidden top, discard top, or open-pile top. Gifts go underneath the burnt player’s hidden pile, in clockwise donor order."],
+		["06 · Call Burns", "BURNS! is available to everyone. A correct call requires a missed play or skipped priority after a turn ends. Early, late, and incorrect calls burn the caller. Every other player gives one card from their hidden top, revealed card, discard top, or open-pile top. Gifts go underneath the burnt player’s hidden pile, in clockwise donor order."],
 		["07 · Win the table", "Get rid of every personal card, including your discard and open pile. Victory is confirmed after the final Burns window and any penalties. You can also win by donating your last card."],
 		["A note about rearranging", "Splitting a row or moving it into an empty row is optional, so endless rearrangements cannot force a Burns. Moving a whole row onto a fitting occupied row frees a space and is required. Unrevealed cards never count as missed plays. Everyone passes explicitly; there is no reaction timer."],
 		["Controls", "Tap a card, then an Ace pile, row heading, or opponent discard. Tap a row card to move it with everything below. Keyboard: Tab to focus, Enter or Space to select. Offline games save after every action. Sound can be turned off on the home screen."]]
@@ -561,7 +562,7 @@ func _style_input(field: LineEdit) -> void:
 		field.add_theme_stylebox_override(key, style)
 
 func _prepare_burn_result() -> void:
-	burn_title = "Burns confirmed" if state.burnt == state.active else "False call"
+	burn_title = "Burns confirmed" if state.get("burn_correct", state.burnt == state.active) else "False call"
 	burn_explanation = "\n\n".join(PackedStringArray(state.log.slice(maxi(0, state.log.size() - 2))))
 	_show_burn_result()
 
@@ -605,3 +606,30 @@ func _apply_ui_theme() -> void:
 	theme.set_stylebox("panel", "TooltipPanel", tooltip)
 	theme.set_color("font_color", "TooltipLabel", CREAM)
 	theme.set_font_size("font_size", "TooltipLabel", 14)
+
+func _can_burn() -> bool:
+	if state.is_empty() or state.phase == "finished": return false
+	if mode == "online":
+		if not net.connected: return false
+		for seat in room.get("seats", []):
+			if not seat.connected: return false
+	return true
+
+func _call_burn() -> void:
+	if not _can_burn(): return
+	if mode != "local":
+		_act({"type": "burn"}, local_seat if mode == "online" else 0)
+		return
+	screen = "burn_caller"
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	layer.label_at("Who called Burns?", Rect2(0, 0, bounds.x, 48), 26, GOLD)
+	var columns := 4 if bounds.x > 600 else 2
+	for seat in range(state.players.size()):
+		var width := bounds.x / columns
+		layer.place(_button(state.players[seat].name, func(): _act({"type": "burn"}, seat), true), Rect2((seat % columns) * width, 68 + (seat / columns) * 56, width - 8, 48))
+	layer.place(_button("Cancel", _show_table), Rect2(0, bounds.y - 48, bounds.x, 48))

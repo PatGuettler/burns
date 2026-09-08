@@ -79,7 +79,9 @@ async def main():
             # Same-revision competing claims: exactly one is accepted by the server.
             await asyncio.gather(send(guest, type='action', revision=state['revision'], action={'type':'burn'}), send(third, type='action', revision=state['revision'], action={'type':'burn'}))
             state = (await receive(host, 'state'))['game']
-            assert state['phase'] == 'penalty' and state['burnt'] == 0
+            assert state['phase'] == 'penalty'
+            assert state['burn_serial'] == 1, 'Only one competing claim should resolve'
+            assert state['burnt'] == 0 if state['burn_correct'] else state['burnt'] in (1, 2)
             # Disconnect and resume the guest's exact seat; a random token is rejected.
             await guest.close()
             disconnected = await receive(host, 'state')

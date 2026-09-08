@@ -14,7 +14,7 @@ Open `project.godot` in Godot, or run:
 godot --path .
 ```
 
-Choose **Pass & play** or **Play computers**, select 2–8 players, and deal. Tap the hidden pile to reveal a card. The revealed card is selected automatically; tap its destination to play it. Tap a row card to select its sequence, or its card-count badge to inspect a long row. **Discard & end** ends the turn and opens the Burns window.
+Choose **Pass & play** or **Play computers**, select 2–8 players, and deal. Tap the hidden pile to reveal a card. Drag an exposed card onto its destination with a mouse or finger, or tap to select and place it. Drag onto your own discard to end the turn. Tap a row card to select its sequence, or its card-count badge to inspect a long row. **Discard & end** ends the turn and opens the Burns window. **BURNS!** stays available to all players, including out of turn; an early or incorrect call penalizes the caller. Empty opponent discards cannot be played on.
 
 Everyone else calls **BURNS!** or **Pass**. The game explains the verdict, then each donor chooses a penalty card. Offline games save after every successful action. Return through **Resume**; dealing a new game replaces the offline save.
 

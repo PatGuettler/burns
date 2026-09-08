@@ -20,7 +20,6 @@ func fixture() -> BurnsGame:
 func _init() -> void:
 	var g := fixture()
 	check(g.act(1, {"type": "draw"}) != "", "Reject out-of-turn draws")
-	check(g.act(1, {"type": "burn"}) != "", "Reject burns during a turn")
 	g.s.players[0].held = 0 # ace diamonds
 	var ace := {"type": "move", "source": "held", "index": 0, "offset": 0, "target": "foundation", "to": 0}
 	check(g.act(0, ace) == "", "Ace starts its foundation")
@@ -54,7 +53,6 @@ func _init() -> void:
 	check(g.s.phase == "review" and g.s.active == 0, "Next player cannot draw before Burns review")
 	check(g.act(1, {"type": "draw"}) != "", "Review window blocks next draw")
 	check(g.act(1, {"type": "burn"}) == "" and g.s.burnt == 0, "Missed ace burns offender")
-	check(g.act(2, {"type": "burn"}) != "", "One claim wins the review window")
 	var before: int = g.s.players[0].play.size()
 	check(g.act(1, {"type": "donate", "source": "play"}) == "", "First donor chooses hidden top")
 	check(g.act(2, {"type": "donate", "source": "play"}) == "", "Second donor chooses hidden top")
@@ -95,6 +93,35 @@ func _init() -> void:
 	corrupt.players[0].play.append(0)
 	check(not restored.restore(corrupt), "Reject duplicate saved cards")
 	check(not restored.restore({"version": 99}), "Reject unsupported saves")
+	# Empty opponent discards are never moves or evidence for Burns.
+	g = fixture()
+	g.s.rows = [[4], [17], [30], [43], [8]]
+	g.s.players[0].held = 15
+	check(g.moves().is_empty(), "Black 3 cannot play on any empty opponent discard")
+	check(g.act(0, {"type": "end"}) == "" and g.s.missed.is_empty(), "Discarding without a play records no missed move")
+	check(g.act(1, {"type": "burn"}) == "" and g.s.burnt == 1, "Calling Burns over an empty discard burns the caller")
+	g = fixture()
+	g.s.rows = [[4], [17], [30], [43], [8]]
+	g.s.players[0].held = 15
+	g.s.players[1].discard = [3]
+	check(g.act(0, {"type": "end"}) == "", "End turn with an occupied playable opponent discard")
+	check(g.act(1, {"type": "burn"}) == "" and g.s.burnt == 0, "Missing a real discard play still burns the offender")
+	g = BurnsGame.new()
+	g.start(["A", "B", "C"], 42)
+	check(g.act(0, {"type": "draw"}) == "", "Reveal before an early call")
+	var revealed: int = g.s.players[0].held
+	var turn: int = g.s.turn
+	check(g.act(1, {"type": "burn"}) == "" and g.s.burnt == 1, "An early caller is burnt, not blocked")
+	check(g.act(2, {"type": "burn"}) == "" and g.s.burnt == 2, "Calls during a penalty create a false-call penalty")
+	var nested := BurnsGame.new()
+	check(nested.restore(g.s), "Interrupted penalties survive save/restore")
+	g = nested
+	while g.s.phase == "penalty":
+		check(g.act(g.s.donors[0], {"type": "donate", "source": "play"}) == "", "Resolve nested donors")
+		check(g.invariant(), "Nested penalties preserve all 52 cards")
+	check(g.s.active == 0 and g.s.turn == turn and g.s.phase == "turn", "Resume the interrupted turn without advancing")
+	check(g.s.players[0].held == revealed, "The interrupted revealed card stays in hand")
+	check(g.act(0, {"type": "burn"}) == "" and not g.s.burn_correct, "Even the active player's own early call is false")
 	# Simulate full games across all player counts; never grant bots hidden foresight.
 	var completed := 0
 	for count in range(2, 9):

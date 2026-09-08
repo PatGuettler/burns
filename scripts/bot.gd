@@ -12,7 +12,7 @@ static func choose(game: BurnsGame, seat: int) -> Dictionary:
 		return {"type": "pass"}
 	if state.phase == "penalty" and seat == state.donors[0]:
 		var p: Dictionary = state.players[seat]
-		return {"type": "donate", "source": "discard" if p.discard_count > 0 else ("play" if p.play_count > 0 else "reserve")}
+		return {"type": "donate", "source": "discard" if p.discard_count > 0 else ("play" if p.play_count > 0 else ("reserve" if p.reserve_count > 0 else "held"))}
 	if state.phase != "turn" or seat != state.active: return {}
 	var moves := game.moves()
 	moves = moves.filter(func(m: Dictionary): return not m.get("optional", false))
