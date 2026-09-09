@@ -8,7 +8,7 @@ burns_godot="${GODOT:-godot}"
 if rg -n 'SCRIPT ERROR|Parse Error|ERROR:' build/checks/import.log; then
   exit 1
 fi
-for test_script in test_deck test_game test_ui test_drag test_art; do
+for test_script in test_deck test_game test_ui test_drag test_art test_presentation; do
   "$burns_godot" --headless --path . --script "tests/${test_script}.gd" 2>&1 | tee "build/checks/${test_script}.log"
   if rg -n 'SCRIPT ERROR|Parse Error|ERROR:' "build/checks/${test_script}.log"; then
     exit 1

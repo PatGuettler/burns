@@ -7,8 +7,11 @@ var drop_target: Dictionary = {}
 var art: BurnsCardView
 var draggable := false
 var suppress_click := false
+var inspect_elapsed := -1.0
+var inspect_origin := Vector2.ZERO
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
+	inspect_elapsed = -1.0
 	if not draggable or not table.app._can_act() or table.state.phase != "turn": return null
 	var cards := table.drag_cards(source)
 	if cards.is_empty(): return null
@@ -59,3 +62,25 @@ func _notification(what: int) -> void:
 
 func _release_drag() -> void:
 	suppress_click = false
+
+func _gui_input(event: InputEvent) -> void:
+	if not art or art.face_down or art.empty_slot: return
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			suppress_click = true
+			table.app.call_deferred("_inspect_card", art.card_id)
+			accept_event()
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			inspect_elapsed = 0.0 if event.pressed else -1.0
+			inspect_origin = event.position
+	elif event is InputEventMouseMotion and event.position.distance_to(inspect_origin) > 10:
+		inspect_elapsed = -1.0
+
+func _process(delta: float) -> void:
+	if inspect_elapsed < 0: return
+	inspect_elapsed += delta
+	if inspect_elapsed >= 0.55:
+		inspect_elapsed = -1.0
+		if get_viewport().gui_is_dragging(): return
+		suppress_click = true
+		table.app.call_deferred("_inspect_card", art.card_id)

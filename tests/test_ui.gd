@@ -13,6 +13,7 @@ func run() -> void:
 	root.add_child(scene)
 	await process_frame
 	scene.sound_on = false
+	scene.animations_enabled = false
 	scene.save_enabled = false
 	var sizes := [Vector2i(320, 568), Vector2i(390, 844), Vector2i(430, 932), Vector2i(844, 390), Vector2i(667, 375), Vector2i(1120, 800), Vector2i(1920, 1080)]
 	for viewport_size in sizes:

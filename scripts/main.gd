@@ -1,5 +1,10 @@
 extends Control
 
+const DISPLAY_FONT := preload("res://assets/fonts/DejaVuSerif.ttf")
+const UI_FONT := preload("res://assets/fonts/DejaVuSans.ttf")
+var safe_margins := Vector4(16, 16, 16, 16)
+var background_shade: ColorRect
+var animations_enabled := true
 const CREAM := Color("f4ead6")
 const MUTED := Color("adc3bd")
 const GOLD := Color("d1ac78")
@@ -26,6 +31,11 @@ var online_url := ""
 var online_name := ""
 var online_code := ""
 var gallery_card := 0
+var gallery_return := "menu"
+var gallery_back := false
+var gallery_swipe_origin := Vector2.ZERO
+var gallery_swiping := false
+var previous_screen := ""
 var burn_title := ""
 var burn_explanation := ""
 var settings := ConfigFile.new()
@@ -67,7 +77,8 @@ func _ready() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 	var shade := ColorRect.new()
-	shade.color = Color(0.015, 0.04, 0.05, 0.68)
+	background_shade = shade
+	shade.color = Color(0.015, 0.04, 0.05, 0.42)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
@@ -76,6 +87,7 @@ func _ready() -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		content.add_theme_constant_override("margin_" + side, 16)
 	add_child(content)
+	_update_safe_area()
 	resized.connect(_schedule_layout)
 	_show_menu()
 
@@ -90,6 +102,12 @@ func _process(delta: float) -> void:
 		if not action.is_empty(): _act(action, seat)
 
 func _clear() -> void:
+	if background_shade: background_shade.color.a = 0.30 if screen in ["menu", "deck_gallery"] else 0.62
+	if screen != previous_screen:
+		previous_screen = screen
+		if animations_enabled and not OS.has_feature("headless"):
+			content.modulate.a = 0.0
+			create_tween().tween_property(content, "modulate:a", 1.0, 0.16)
 	for child in content.get_children():
 		content.remove_child(child)
 		child.queue_free()
@@ -112,22 +130,28 @@ func _button(text: String, action: Callable, primary := false) -> Button:
 	button.text = text
 	button.clip_text = true
 	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	button.custom_minimum_size = Vector2(maxf(44, ThemeDB.fallback_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 24), 44)
+	button.custom_minimum_size = Vector2(maxf(44, UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 24), 44)
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_size_override("font_size", 16)
 	button.add_theme_color_override("font_color", CREAM)
 	for key in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color("b85637") if primary else Color(0.10, 0.23, 0.24, 0.46)
+		style.bg_color = Color("aa5035") if primary else Color("152a2c")
 		if key == "hover": style.bg_color = style.bg_color.lightened(0.15)
 		if key == "disabled": style.bg_color = Color("253335")
-		style.border_color = GOLD
-		style.set_border_width_all(2 if key == "focus" else 0)
-		style.set_corner_radius_all(28)
+		style.border_color = GOLD if key == "focus" else (Color("ce8660") if primary else Color("3f5552"))
+		style.set_border_width_all(2 if key == "focus" else 1)
+		style.set_corner_radius_all(16)
+		style.shadow_color = Color(0, 0, 0, 0.2)
+		style.shadow_size = 4
+		style.shadow_offset = Vector2(0, 2)
 		style.content_margin_left = 12
 		style.content_margin_right = 12
 		button.add_theme_stylebox_override(key, style)
 	button.pressed.connect(action)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", CREAM)
+	button.add_theme_color_override("font_disabled_color", Color("7c8883"))
 	return button
 
 func _flow(parent: Node) -> HFlowContainer:
@@ -155,34 +179,9 @@ func _page(title: String) -> VBoxContainer:
 func _show_menu() -> void:
 	screen = "menu"
 	_clear()
-	var layer := BurnsTableView.new()
-	layer.app = self
-	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
-	layer.size = bounds
-	var landscape := bounds.y < 500 and bounds.x > 620
-	var menu_w := minf(420, bounds.x)
-	var title_y := 38.0 if landscape else clampf(bounds.y * 0.12, 36, 110)
-	layer.label_at("THE FAMILY CARD TABLE", Rect2(0, 0, bounds.x, 24), 13, GOLD)
-	layer.label_at("Burns", Rect2(0, title_y, bounds.x, 92), 76 if bounds.x < 600 else 88, CREAM)
-	layer.label_at("A little solitaire. A little rivalry.", Rect2(0, title_y + 96, minf(bounds.x, 520), 36), 18 if landscape else 20, MUTED)
-	var action_x := bounds.x * 0.53 if landscape else 0.0
-	if landscape: menu_w = bounds.x - action_x
-	var action_y := 40.0 if landscape else title_y + 154
-	var actions: Array = [["Pass & play  >", func(): _setup("local"), true], ["Play computers  >", func(): _setup("bots"), false], ["Online table  >", _online_setup, false]]
-	for i in range(actions.size()):
-		var item: Array = actions[i]
-		layer.place(_button(item[0], item[1], item[2]), Rect2(action_x, action_y + i * 56, menu_w, 48))
-	var extras_y := action_y + 176
-	var extras: Array = []
-	if game or not room.is_empty() or FileAccess.file_exists(SAVE): extras.append(["Resume", _resume])
-	extras.append(["Rules", _show_rules])
-	extras.append(["Sound on" if sound_on else "Sound off", _toggle_sound])
-	var ew := (menu_w - (extras.size() - 1) * 8) / extras.size()
-	for i in range(extras.size()):
-		layer.place(_button(extras[i][0], extras[i][1]), Rect2(action_x + i * (ew + 8), extras_y, ew, 44))
-	layer.place(_button("View the deck", _show_deck_gallery), Rect2(action_x, extras_y + 52, menu_w, 44))
-	layer.label_at(message if not message.is_empty() else "2–8 PLAYERS  ·  52 CARDS  ·  ONE SHARP EYE", Rect2(0, bounds.y - 24, bounds.x, 24), 12, GOLD)
+	var home := BurnsHomeView.new()
+	content.add_child(home)
+	home.build_home(self, _bounds())
 
 func _toggle_sound() -> void:
 	sound_on = not sound_on
@@ -197,7 +196,7 @@ func _setup(new_mode: String) -> void:
 	var layer := BurnsTableView.new()
 	layer.app = self
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
 	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 90, 44))
 	layer.label_at("Gather your table", Rect2(102, 0, bounds.x - 102, 44), 23, GOLD)
@@ -208,7 +207,7 @@ func _setup(new_mode: String) -> void:
 	var count := layer.label_at(str(player_count), Rect2(bounds.x / 2 - 38, 124, 76, 48), 34, GOLD)
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	layer.place(_button("+", func(): player_count = mini(8, player_count + 1); _setup(new_mode)), Rect2(bounds.x / 2 + 44, 124, 48, 48))
-	var description := _paragraph("Aces first, then rows, then opponents’ discards. Tap a card and its destination. Discard to end your turn; everyone else can call Burns or pass.", 17 if bounds.y > 440 else 14)
+	var description := _paragraph("Aces first, then rows, then opponents’ discards. Drag a card to play, or tap it and its destination. Discard to end your turn; everyone else can call Burns or pass.", 17 if bounds.y > 440 else 14)
 	layer.place(description, Rect2(0, 196, bounds.x, bounds.y - 262))
 	layer.place(_button("Deal a new game", func(): _new_game(new_mode), true), Rect2(0, bounds.y - 48, bounds.x, 48))
 
@@ -254,7 +253,7 @@ func _show_table() -> void:
 	_clear()
 	var table := BurnsTableView.new()
 	content.add_child(table)
-	table.build(self, size - Vector2(32, 32))
+	table.build(self, _bounds())
 
 func _inspect_row(row: int) -> void:
 	if state.is_empty(): return
@@ -265,7 +264,7 @@ func _inspect_row(row: int) -> void:
 	layer.app = self
 	layer.state = state
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
 	layer.place(_button("‹ Table", _show_table), Rect2(0, 0, 110, 44))
 	layer.label_at("Row %d · choose a sequence" % (row + 1), Rect2(118, 0, bounds.x - 118, 44), 18, GOLD)
@@ -290,6 +289,7 @@ func _schedule_layout() -> void:
 
 func _relayout() -> void:
 	resizing = false
+	_update_safe_area()
 	match screen:
 		"game": _show_table()
 		"menu": _show_menu()
@@ -331,7 +331,7 @@ func _handoff(actor: int) -> void:
 	var layer := BurnsTableView.new()
 	layer.app = self
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
 	layer.place(_button("‹ Home", _show_menu), Rect2(0, 0, 96, 44))
 	layer.label_at("Pass the table", Rect2(108, 0, bounds.x - 108, 44), 23, GOLD)
@@ -377,8 +377,8 @@ func _save() -> void:
 	file.set_value("game", "mode", mode)
 	var error := file.save(SAVE + ".tmp")
 	if error == OK:
-		DirAccess.rename_absolute(ProjectSettings.globalize_path(SAVE + ".tmp"), ProjectSettings.globalize_path(SAVE))
-	else: message = "Could not save this game on the device."
+		error = DirAccess.rename_absolute(ProjectSettings.globalize_path(SAVE + ".tmp"), ProjectSettings.globalize_path(SAVE))
+	if error != OK: message = "Could not save this game on the device."
 
 func _resume() -> void:
 	if mode == "online" and not room.is_empty():
@@ -421,7 +421,7 @@ func _online_setup() -> void:
 	var layer := BurnsTableView.new()
 	layer.app = self
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
 	var compact := bounds.y < 500
 	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 90, 44))
@@ -464,6 +464,7 @@ func _online_setup() -> void:
 func _online_state(snapshot: Dictionary) -> void:
 	var previous_burn: int = state.get("burn_serial", 0)
 	var keep_result := screen == "burn_result"
+	var keep_gallery := screen == "deck_gallery" and gallery_return == "game"
 	room = snapshot
 	local_seat = int(snapshot.seat)
 	settings.set_value("network", "credentials", net.credentials)
@@ -474,6 +475,7 @@ func _online_state(snapshot: Dictionary) -> void:
 	if state.is_empty(): _lobby()
 	elif int(state.get("burn_serial", 0)) > previous_burn: _prepare_burn_result()
 	elif keep_result: _show_burn_result()
+	elif keep_gallery: _show_deck_gallery()
 	else: _show_table()
 
 func _lobby() -> void:
@@ -482,7 +484,7 @@ func _lobby() -> void:
 	var layer := BurnsTableView.new()
 	layer.app = self
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
 	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 90, 44))
 	layer.label_at("Your private table", Rect2(102, 0, bounds.x - 102, 44), 22, GOLD)
@@ -525,12 +527,12 @@ func _show_rules() -> void:
 		["06 · Call Burns", "BURNS! is available to everyone. A correct call requires a missed play or skipped priority after a turn ends. Early, late, and incorrect calls burn the caller. Every other player gives one card from their hidden top, revealed card, discard top, or open-pile top. Gifts go underneath the burnt player’s hidden pile, in clockwise donor order."],
 		["07 · Win the table", "Get rid of every personal card, including your discard and open pile. Victory is confirmed after the final Burns window and any penalties. You can also win by donating your last card."],
 		["A note about rearranging", "Splitting a row or moving it into an empty row is optional, so endless rearrangements cannot force a Burns. Moving a whole row onto a fitting occupied row frees a space and is required. Unrevealed cards never count as missed plays. Everyone passes explicitly; there is no reaction timer."],
-		["Controls", "Tap a card, then an Ace pile, row heading, or opponent discard. Tap a row card to move it with everything below. Keyboard: Tab to focus, Enter or Space to select. Offline games save after every action. Sound can be turned off on the home screen."]]
+		["Controls", "Drag a card to its destination, or tap to select and place. Hold a face-up card to inspect its artwork. Tap a row card to move it with everything below. Keyboard: Tab to focus, Enter or Space to select. Offline games save after every action. Sound can be turned off on the home screen."]]
 	var section: Array = sections[rules_page]
 	var layer := BurnsTableView.new()
 	layer.app = self
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
 	layer.place(_button("‹ Back", _show_table if not state.is_empty() else _show_menu), Rect2(0, 0, 100, 44))
 	layer.label_at("How to play", Rect2(114, 0, bounds.x - 114, 44), 24, GOLD)
@@ -576,7 +578,7 @@ func _show_burn_result() -> void:
 	var layer := BurnsTableView.new()
 	layer.app = self
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
 	layer.label_at(burn_title, Rect2(0, 12, bounds.x, 56), 34, GOLD)
 	var text := _paragraph(burn_explanation, 21 if bounds.y > 500 else 16, CREAM)
@@ -600,6 +602,8 @@ func _sync_display_density() -> void:
 
 func _apply_ui_theme() -> void:
 	theme = Theme.new()
+	theme.default_font = UI_FONT
+	theme.default_font_size = 16
 	var tooltip := StyleBoxFlat.new()
 	tooltip.bg_color = Color("12383e")
 	tooltip.set_corner_radius_all(14)
@@ -629,7 +633,7 @@ func _call_burn() -> void:
 	var layer := BurnsTableView.new()
 	layer.app = self
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
 	layer.label_at("Who called Burns?", Rect2(0, 0, bounds.x, 48), 26, GOLD)
 	var columns := 4 if bounds.x > 600 else 2
@@ -644,18 +648,81 @@ func _show_deck_gallery() -> void:
 	var layer := BurnsTableView.new()
 	layer.app = self
 	content.add_child(layer)
-	var bounds := size - Vector2(32, 32)
+	var bounds := _bounds()
 	layer.size = bounds
-	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 88, 44))
-	layer.label_at("THE RAVEN DECK", Rect2(98, 0, bounds.x - 98, 44), 16, GOLD)
-	var height := minf(minf(bounds.y - 150, 660), bounds.x * 1.5)
+	layer.place(_button("‹ Table" if gallery_return == "game" else "‹ Home", _close_gallery), Rect2(0, 0, 88, 44))
+	var heading := layer.label_at("THE RAVEN DECK", Rect2(96, 0, bounds.x - 178, 44), 11, GOLD)
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.place(_button("Face" if gallery_back else "Back", func(): gallery_back = not gallery_back; _show_deck_gallery()), Rect2(bounds.x - 74, 0, 74, 44))
+	var landscape := bounds.x > bounds.y * 1.4
+	var image_area := Rect2(0, 58, bounds.x * 0.54 if landscape else bounds.x, bounds.y - (68 if landscape else 218))
+	var height := minf(image_area.size.y, image_area.size.x * 1.5)
 	var card := BurnsCardView.new()
+	card.name = "GalleryCard"
 	card.card_id = gallery_card
+	card.face_down = gallery_back
+	card.artwork_only = true
 	card.size = Vector2(height * 2.0 / 3.0, height)
-	card.position = Vector2((bounds.x - card.size.x) / 2, 52)
+	card.position = image_area.get_center() - card.size / 2
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.gui_input.connect(_gallery_input)
 	layer.add_child(card)
-	var caption := BurnsDeck.card_name(gallery_card)
-	if gallery_card == 51: caption = "The Noodle King · King of Spades"
-	layer.label_at(caption, Rect2(0, bounds.y - 88, bounds.x, 32), 16, CREAM)
-	layer.place(_button("‹ Previous", func(): gallery_card = posmod(gallery_card - 1, 52); _show_deck_gallery()), Rect2(0, bounds.y - 48, bounds.x / 2 - 6, 44))
-	layer.place(_button("Next ›", func(): gallery_card = (gallery_card + 1) % 52; _show_deck_gallery()), Rect2(bounds.x / 2 + 6, bounds.y - 48, bounds.x / 2 - 6, 44))
+	var panel := Rect2(bounds.x * 0.57, 72, bounds.x * 0.43, bounds.y - 72) if landscape else Rect2(0, bounds.y - 154, bounds.x, 154)
+	var caption := "The Noodle King" if gallery_card == 51 else ("Jack of Spades" if gallery_card == 49 else BurnsDeck.card_name(gallery_card))
+	if gallery_back: caption = "The Raven Back"
+	_heading(layer, caption, Rect2(panel.position, Vector2(panel.size.x, 32)), 21, true)
+	var sub := layer.label_at("Swipe to explore  ·  %02d / 52" % (gallery_card + 1), Rect2(panel.position.x, panel.position.y + 34, panel.size.x, 20), 11, MUTED)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var suit_w := (panel.size.x - 18) / 4
+	for suit in range(4):
+		var button := _button(["Diamonds", "Clubs", "Hearts", "Spades"][suit], func(): gallery_card = suit * 13 + gallery_card % 13; gallery_back = false; _show_deck_gallery(), not gallery_back and gallery_card / 13 == suit)
+		button.add_theme_font_size_override("font_size", 10)
+		layer.place(button, Rect2(panel.position.x + suit * (suit_w + 6), panel.end.y - 94, suit_w, 40))
+	var nav_w := (panel.size.x - 60) / 2
+	layer.place(_button("‹ Previous", func(): _gallery_step(-1)), Rect2(panel.position.x, panel.end.y - 46, nav_w, 44))
+	layer.place(_button("K", func(): gallery_card = (gallery_card / 13) * 13 + 12; gallery_back = false; _show_deck_gallery()), Rect2(panel.position.x + nav_w + 6, panel.end.y - 46, 48, 44))
+	layer.place(_button("Next ›", func(): _gallery_step(1)), Rect2(panel.end.x - nav_w, panel.end.y - 46, nav_w, 44))
+
+func _gallery_step(direction: int) -> void:
+	gallery_card = posmod(gallery_card + direction, 52)
+	gallery_back = false
+	_show_deck_gallery()
+
+func _gallery_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			gallery_swipe_origin = event.global_position
+			gallery_swiping = true
+		elif gallery_swiping:
+			gallery_swiping = false
+			var delta: Vector2 = event.global_position - gallery_swipe_origin
+			if absf(delta.x) > 40 and absf(delta.x) > absf(delta.y): _gallery_step(-1 if delta.x > 0 else 1)
+
+func _inspect_card(card: int) -> void:
+	gallery_return = "game"
+	gallery_card = card
+	gallery_back = false
+	_show_deck_gallery()
+
+func _close_gallery() -> void:
+	gallery_swiping = false
+	if gallery_return == "game": _show_table()
+	else: _show_menu()
+
+func _bounds() -> Vector2:
+	return size - Vector2(safe_margins.x + safe_margins.z, safe_margins.y + safe_margins.w)
+
+func _update_safe_area() -> void:
+	if not content: return
+	safe_margins = Vector4(16, 16, 16, 16)
+	if OS.get_name() in ["Android", "iOS"]:
+		safe_margins = BurnsSafeLayout.margins(Vector2(get_window().size), size, Rect2(DisplayServer.get_display_safe_area()))
+	var values := [safe_margins.x, safe_margins.y, safe_margins.z, safe_margins.w]
+	var sides := ["left", "top", "right", "bottom"]
+	for index in range(4): content.add_theme_constant_override("margin_" + sides[index], int(values[index]))
+
+func _heading(layer: BurnsTableView, text: String, rect: Rect2, font_size: int, centered := false) -> Label:
+	var label := layer.label_at(text, rect, font_size, CREAM)
+	label.add_theme_font_override("font", DISPLAY_FONT)
+	if centered: label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return label
