@@ -92,4 +92,4 @@ godot --path . --audio-driver Dummy --script tests/test_ui.gd -- --screenshots
 
 Screenshots and build outputs stay under ignored `build/`. Testing details and remaining release work are in [docs/RELEASE.md](docs/RELEASE.md). Original art provenance and exact image-generation prompts are in [docs/ART.md](docs/ART.md).
 
-The **View the deck** menu opens all 52 cards in the raven-and-crown theme. The supplied Noodle King is the King of Spades; the other court portraits are marked placeholders. Art sources and replacement instructions: [Raven deck art](docs/RAVEN_ART.md).
+The **View the deck** menu opens all 52 cards in the raven-and-crown theme. The supplied Noodle King and Jack artwork are the King and Jack of Spades; the ten other court portraits are marked placeholders. Art sources and replacement instructions: [Raven deck art](docs/RAVEN_ART.md).

@@ -4,7 +4,7 @@ The original user-supplied King of Spades is preserved byte-for-byte at `assets/
 
 Three new raster assets were made with the built-in image_gen tool (no CLI fallback): `raven_face.png`, `raven_back.png`, `raven_room.png`, all under `assets/art/deck/`. Number cards compose the engraved face with exact suit pip counts and corner ranks. Black suits are represented in silver on charcoal; red suits use warm coral, preserving the alternating-color distinction. All suit symbols are vector geometry to avoid missing font glyphs.
 
-The eleven other court cards deliberately display crown-and-suit placeholders marked PORTRAIT TO COME. To supply another complete face-card image, add it under `assets/art/deck/faces/` and add a preload entry to `BurnsDeckArt.PORTRAITS` in `scripts/deck_art.gd`. Card IDs: diamonds J/Q/K 10/11/12, clubs 23/24/25, hearts 36/37/38, spades 49/50/51. No invented portraits are used. In-game View the deck allows inspection of all 52 cards without scrolling.
+The ten other court cards deliberately display crown-and-suit placeholders marked PORTRAIT TO COME. To supply another complete face-card image, add it under `assets/art/deck/faces/` and add a preload entry to `BurnsDeckArt.PORTRAITS` in `scripts/deck_art.gd`. Card IDs: diamonds J/Q/K 10/11/12, clubs 23/24/25, hearts 36/37/38, spades 49/50/51. No invented portraits are used. In-game View the deck allows inspection of all 52 cards without scrolling.
 
 ## Exact generation prompts
 
@@ -21,3 +21,7 @@ Use case: stylized-concept. Asset type: actual production playing-card BACK text
 Use case: stylized-concept. Asset type: production Burns game menu and table backdrop, landscape 1536x1024. Original fine painterly illustration with etched silver and antique copper detail. Overhead midnight petrol teal felt table fades into charcoal black, barely lit by soft warm embers. LEFT TWO THIRDS almost empty dark felt for UI. Along extreme RIGHT edge only, three overlapping charcoal playing-card backs with delicate silver raven feathers, fine crown medallions and narrow copper border engraving. One loose dark silver feather beside them. Gothic raven-and-crown ornament to coordinate with a monochrome Noodle King portrait card, blended with cozy old Burns teal-felt-and-copper atmosphere. No people, no faces, no numbers, no text or pseudo-writing, no exposed ranks, no bright ivory cards, no logos or watermark. Quiet restrained high-end board game art, avoid distracting highlights behind controls.
 
 
+
+## Supplied Jack of Spades
+
+`assets/art/deck/faces/jack_spades.png` preserves the supplied screenshot unchanged (SHA-256 `cf625d4725448214742a1b0d7aed03f36b16483f7749c2abbbe9e133c5517591`). `jack_spades.tres` selects the card rectangle `(75, 69, 570, 1171)` so surrounding screenshot margins do not appear in play. The person, colors, card border, and lettering are unchanged; no image generation or retouching was used. Card 49 now uses this portrait; ten other court portraits remain placeholders.

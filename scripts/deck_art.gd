@@ -3,7 +3,7 @@ extends RefCounted
 ## Full-card portraits are fitted without cropping or changing the supplied image.
 const FACE := preload("res://assets/art/deck/raven_face.png")
 const BACK := preload("res://assets/art/deck/raven_back.png")
-const PORTRAITS := {51: preload("res://assets/art/deck/faces/king_spades.jpg")}
+const PORTRAITS := {49: preload("res://assets/art/deck/faces/jack_spades.tres"), 51: preload("res://assets/art/deck/faces/king_spades.jpg")}
 
 static func portrait(card: int) -> Texture2D:
 	return PORTRAITS.get(card)
