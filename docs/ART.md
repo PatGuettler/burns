@@ -1,8 +1,12 @@
 # Art provenance
 
-## Standard-deck revision (current)
+## Raven deck (current)
 
-`assets/art/card_room_standard.png` is the current background, edited with the built-in image generator from the original illustration. Hearts, diamonds, clubs, and spades replace the six-suit props. The original remains archived below. `assets/art/icon.svg` is an original code-native app mark extending the ivory-card and copper-ember visual system.
+See [RAVEN_ART.md](RAVEN_ART.md) for the current card textures, original King of Spades, face-card placeholders, replacement instructions, and exact generation prompts. The new raven room replaces the previous ivory-card backdrop.
+
+## Standard-deck revision (archived)
+
+`assets/art/card_room_standard.png` is the previous background, edited with the built-in image generator from the original illustration. Hearts, diamonds, clubs, and spades replace the six-suit props. The original remains archived below. `assets/art/icon.svg` is an original code-native app mark extending the ivory-card and copper-ember visual system.
 
 Exact edit prompt:
 

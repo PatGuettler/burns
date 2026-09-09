@@ -1,6 +1,6 @@
 class_name BurnsCardView
 extends Control
-## Resolution-independent original card artwork, with no font dependency for suits.
+## Engraved raster frames with resolution-independent, font-free suit pips.
 
 var card_id: int = 0
 var face_down := false
@@ -11,11 +11,12 @@ var slot_text := ""
 var highlighted := false
 var focused := false
 var hovered := false
-const INK := Color("192d31")
-const RED := Color("b24632")
+const INK := Color("e4e1d9")
+const RED := Color("f18b79")
 const COPPER := Color("bd9563")
 
 func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	custom_minimum_size = Vector2.ZERO
 	resized.connect(queue_redraw)
 	tooltip_text = "Face-down play pile" if face_down else BurnsDeck.card_name(card_id)
@@ -28,7 +29,7 @@ func _draw() -> void:
 	var card_size := Vector2(76, 114)
 	var rect := Rect2(Vector2.ZERO, card_size)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("123e44") if face_down else Color("f4ead6")
+	style.bg_color = Color("141919")
 	if empty_slot: style.bg_color = Color(0.08, 0.18, 0.19, 0.32)
 	if hovered and not empty_slot: style.bg_color = style.bg_color.lightened(0.06)
 	style.border_color = Color("ffe1a0") if highlighted or focused else COPPER
@@ -43,21 +44,45 @@ func _draw() -> void:
 		if slot_suit >= 0: _draw_suit([0, 1, 4, 3][slot_suit], Vector2(38, 77), 12, COPPER)
 		return
 	if face_down:
-		draw_rect(rect.grow(-9), COPPER, false, 1)
-		var center := card_size / 2
-		for radius in [14.0, 22.0, 30.0]:
-			draw_arc(center, radius, 0, TAU, 64, COPPER, 1, true)
-		for angle in range(0, 360, 45):
-			var direction := Vector2.from_angle(deg_to_rad(angle))
-			draw_line(center + direction * 13, center + direction * 31, COPPER, 1, true)
+		_draw_card_texture(BurnsDeckArt.BACK, rect.grow(-2))
 		return
+	var portrait := BurnsDeckArt.portrait(card_id)
+	if portrait:
+		# Preserve the supplied composition and the person's proportions exactly.
+		var fitted := portrait.get_size() * minf(72.0 / portrait.get_width(), 110.0 / portrait.get_height())
+		draw_texture_rect(portrait, Rect2((card_size - fitted) / 2, fitted), false)
+	else:
+		_draw_card_texture(BurnsDeckArt.FACE, rect.grow(-2))
 	var suit := BurnsDeck.suit_of(card_id)
 	var color := RED if suit in BurnsDeck.RED_SUITS else INK
-	var font := ThemeDB.fallback_font
-	draw_string(font, Vector2(10, 26), BurnsDeck.rank_text(card_id), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, color)
-	draw_string(font, Vector2(card_size.x - 27, card_size.y - 11), BurnsDeck.rank_text(card_id), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, color)
-	_draw_suit([0, 1, 4, 3][suit], card_size / 2, 18, color)
-	_draw_suit([0, 1, 4, 3][suit], Vector2(18, 41), 6, color)
+	var rank := BurnsDeck.rank_of(card_id)
+	if not portrait:
+		if rank <= 10:
+			for pip in BurnsDeckArt.pip_positions(rank):
+				_draw_suit([0, 1, 4, 3][suit], pip, 16 if rank == 1 else 6.5, color)
+		else:
+			_draw_portrait_placeholder(rank, suit, color)
+	if portrait and size.x >= 160: return # Gallery shows the complete supplied art untouched.
+	# Opaque index gutters keep ranks legible on phones and stacked rows.
+	for flipped in [false, true]:
+		draw_set_transform(size if flipped else Vector2.ZERO, PI if flipped else 0.0, size / card_size)
+		draw_rect(Rect2(3, 3, 18, 34), Color("141919"))
+		var rank_label := BurnsDeck.rank_text(card_id)
+		var rank_size := 22
+		while ThemeDB.fallback_font.get_string_size(rank_label, HORIZONTAL_ALIGNMENT_LEFT, -1, rank_size).x > 18:
+			rank_size -= 1
+		draw_string(ThemeDB.fallback_font, Vector2(3, 23), rank_label, HORIZONTAL_ALIGNMENT_CENTER, 18, rank_size, color)
+		_draw_suit([0, 1, 4, 3][suit], Vector2(12, 30), 4.7, color)
+
+func _draw_portrait_placeholder(rank: int, suit: int, color: Color) -> void:
+	# Deliberately no invented person: the owner supplies every court portrait.
+	draw_arc(Vector2(38, 54), 19, 0, TAU, 64, COPPER, 0.6, true)
+	var crown := PackedVector2Array([Vector2(25, 44), Vector2(30, 48), Vector2(33, 41), Vector2(38, 47), Vector2(43, 41), Vector2(46, 48), Vector2(51, 44), Vector2(48, 55), Vector2(28, 55)])
+	draw_colored_polygon(crown, COPPER)
+	_draw_suit([0, 1, 4, 3][suit], Vector2(38, 65), 5, color)
+	var title: String = {11: "JACK", 12: "QUEEN", 13: "KING"}[rank]
+	draw_string(ThemeDB.fallback_font, Vector2(0, 86), title, HORIZONTAL_ALIGNMENT_CENTER, 76, 8, color)
+	draw_string(ThemeDB.fallback_font, Vector2(0, 94), "PORTRAIT TO COME", HORIZONTAL_ALIGNMENT_CENTER, 76, 4, COPPER)
 
 func _draw_suit(suit: int, center: Vector2, radius: float, color: Color) -> void:
 	match suit:
@@ -86,7 +111,7 @@ func _draw_suit(suit: int, center: Vector2, radius: float, color: Color) -> void
 func _draw_compact() -> void:
 	draw_set_transform(Vector2.ZERO, 0, size / Vector2(110, 48))
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("12383e") if empty_slot else Color("f4ead6")
+	style.bg_color = Color("172224") if empty_slot else Color("141919")
 	style.set_corner_radius_all(24)
 	style.border_color = COPPER
 	style.set_border_width_all(2 if highlighted or focused else 0)
@@ -98,3 +123,17 @@ func _draw_compact() -> void:
 		var color := RED if suit in BurnsDeck.RED_SUITS else INK
 		draw_string(ThemeDB.fallback_font, Vector2(23, 33), BurnsDeck.rank_text(card_id), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, color)
 		_draw_suit([0, 1, 4, 3][suit], Vector2(79, 24), 12, color)
+
+func _draw_card_texture(texture: Texture2D, rect: Rect2) -> void:
+	# Rounded mesh clips the raster's outside corners without changing the source asset.
+	var vertices := PackedVector2Array()
+	var uv := PackedVector2Array()
+	var radius := 6.0
+	var centers := [rect.position + Vector2(radius, radius), Vector2(rect.end.x - radius, rect.position.y + radius), rect.end - Vector2(radius, radius), Vector2(rect.position.x + radius, rect.end.y - radius)]
+	for corner in range(4):
+		for step in range(9):
+			var angle := PI + corner * PI / 2 + step * PI / 16
+			var point: Vector2 = centers[corner] + Vector2.from_angle(angle) * radius
+			vertices.append(point)
+			uv.append((point - rect.position) / rect.size)
+	draw_polygon(vertices, PackedColorArray([Color.WHITE]), uv, texture)

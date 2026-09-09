@@ -25,6 +25,7 @@ var resizing := false
 var online_url := ""
 var online_name := ""
 var online_code := ""
+var gallery_card := 0
 var burn_title := ""
 var burn_explanation := ""
 var settings := ConfigFile.new()
@@ -58,7 +59,8 @@ func _ready() -> void:
 	net.changed.connect(_online_state)
 	net.notice.connect(func(text: String): message = text; _refresh())
 	var background := TextureRect.new()
-	background.texture = preload("res://assets/art/card_room_standard.png")
+	background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	background.texture = preload("res://assets/art/deck/raven_room.png")
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -179,6 +181,7 @@ func _show_menu() -> void:
 	var ew := (menu_w - (extras.size() - 1) * 8) / extras.size()
 	for i in range(extras.size()):
 		layer.place(_button(extras[i][0], extras[i][1]), Rect2(action_x + i * (ew + 8), extras_y, ew, 44))
+	layer.place(_button("View the deck", _show_deck_gallery), Rect2(action_x, extras_y + 52, menu_w, 44))
 	layer.label_at(message if not message.is_empty() else "2–8 PLAYERS  ·  52 CARDS  ·  ONE SHARP EYE", Rect2(0, bounds.y - 24, bounds.x, 24), 12, GOLD)
 
 func _toggle_sound() -> void:
@@ -295,6 +298,7 @@ func _relayout() -> void:
 		"row": _inspect_row(row_inspection)
 		"burn_result": _show_burn_result()
 		"burn_caller": _call_burn()
+		"deck_gallery": _show_deck_gallery()
 		"lobby": _lobby()
 		"online": _online_setup()
 
@@ -633,3 +637,25 @@ func _call_burn() -> void:
 		var width := bounds.x / columns
 		layer.place(_button(state.players[seat].name, func(): _act({"type": "burn"}, seat), true), Rect2((seat % columns) * width, 68 + (seat / columns) * 56, width - 8, 48))
 	layer.place(_button("Cancel", _show_table), Rect2(0, bounds.y - 48, bounds.x, 48))
+
+func _show_deck_gallery() -> void:
+	screen = "deck_gallery"
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := size - Vector2(32, 32)
+	layer.size = bounds
+	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 88, 44))
+	layer.label_at("THE RAVEN DECK", Rect2(98, 0, bounds.x - 98, 44), 16, GOLD)
+	var height := minf(minf(bounds.y - 150, 660), bounds.x * 1.5)
+	var card := BurnsCardView.new()
+	card.card_id = gallery_card
+	card.size = Vector2(height * 2.0 / 3.0, height)
+	card.position = Vector2((bounds.x - card.size.x) / 2, 52)
+	layer.add_child(card)
+	var caption := BurnsDeck.card_name(gallery_card)
+	if gallery_card == 51: caption = "The Noodle King · King of Spades"
+	layer.label_at(caption, Rect2(0, bounds.y - 88, bounds.x, 32), 16, CREAM)
+	layer.place(_button("‹ Previous", func(): gallery_card = posmod(gallery_card - 1, 52); _show_deck_gallery()), Rect2(0, bounds.y - 48, bounds.x / 2 - 6, 44))
+	layer.place(_button("Next ›", func(): gallery_card = (gallery_card + 1) % 52; _show_deck_gallery()), Rect2(bounds.x / 2 + 6, bounds.y - 48, bounds.x / 2 - 6, 44))

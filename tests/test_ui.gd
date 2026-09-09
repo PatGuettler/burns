@@ -47,6 +47,11 @@ func run() -> void:
 			await process_frame
 			_validate(scene, viewport_size)
 			check(_count_cards(scene) == 13, "Every card in the sequence is selectable without scrolling")
+		for gallery_id in [0, 9, 10, 51]:
+			scene.gallery_card = gallery_id
+			scene._show_deck_gallery()
+			await process_frame
+			_validate(scene, viewport_size)
 		scene._show_menu()
 		await process_frame
 		_validate(scene, viewport_size)
