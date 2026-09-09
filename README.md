@@ -2,7 +2,7 @@
 
 A family multiplayer solitaire game built in Godot 4.7.1 with GDScript. Version 0.2 is playable with a standard 52-card deck, 2–8 players, pass-and-play, computer opponents, and private online rooms.
 
-The board adapts to portrait phones, landscape phones, and desktop windows. All five rows, opponents’ discard targets, the current hand, and turn controls stay on screen. Long rows open a card-selection grid; rules use pages. There are no scrollbars. Suit icons, card faces, card backs, and app branding are custom artwork, with no dependency on suit glyphs in the browser’s fonts.
+The board adapts to portrait phones, landscape phones, and desktop windows, with safe-area spacing on native phones. Hold any face-up card to inspect its original artwork, or open **Explore the deck** from Home and swipe through the cards, switch suits, or view the raven back. All five rows, opponents’ discard targets, the current hand, and turn controls stay on screen. Long rows open a card-selection grid; rules use pages. There are no scrollbars. Suit icons, card faces, card backs, and app branding are custom artwork, with no dependency on suit glyphs in the browser’s fonts.
 
 **This is a playable development build.** Web and Android test exports have succeeded. Google Play CI uploads a paid, ad-free AAB as `com.grapegames.burns` to the internal track; store listing, pricing, and physical-device testing still need to be finished. See [docs/PLAY_ANDROID.md](docs/PLAY_ANDROID.md).
 
@@ -92,4 +92,4 @@ godot --path . --audio-driver Dummy --script tests/test_ui.gd -- --screenshots
 
 Screenshots and build outputs stay under ignored `build/`. Testing details and remaining release work are in [docs/RELEASE.md](docs/RELEASE.md). Original art provenance and exact image-generation prompts are in [docs/ART.md](docs/ART.md).
 
-The **View the deck** menu opens all 52 cards in the raven-and-crown theme. The supplied Noodle King and Jack artwork are the King and Jack of Spades; the ten other court portraits are marked placeholders. Art sources and replacement instructions: [Raven deck art](docs/RAVEN_ART.md).
+The **Explore the deck** menu opens all 52 cards in the raven-and-crown theme. The supplied Noodle King and Jack artwork are the King and Jack of Spades; the ten other court portraits are marked placeholders. Art sources and replacement instructions: [Raven deck art](docs/RAVEN_ART.md).

@@ -50,8 +50,9 @@ the store listing.
       `github-actions@advance-anvil-449102-v7.iam.gserviceaccount.com` access
       to this app (same account as Peregrine / Pigeon)
 - [ ] **Contains ads** = No
-- [ ] Privacy policy: `https://patguettler.github.io/privacy-policy.html`
-- [ ] Data deletion URL: `https://patguettler.github.io/privacy-policy.html#data-deletion`
+- [ ] Privacy policy: host `store/privacy-policy.html` (Burns is paid and ad-free; do not reuse the Unicorn Arcade AdMob policy URL)
+- [ ] Data deletion URL: that same hosted page with `#data-deletion`
+- [ ] Listing images in `store/play/`: `icon-512.png`, `phone-1080x1920.png`, `feature-1024x500.png`
 - [ ] Website: `https://patguettler.github.io`
 - [ ] Set the one-time price (Play Console → Monetize → App pricing)
 - [ ] Content rating, Data safety, store listing, and screenshots

@@ -216,12 +216,15 @@ func _restore_rooms() -> void:
 	if file.load(store_path) != OK: return
 	var data = file.get_value("server", "rooms", {})
 	if not data is Dictionary: return
+	var expired := false
 	for code in data:
 		var saved = data[code]
 		if not saved is Dictionary or not saved.has_all(["seats", "updated", "game"]): continue
 		if not saved.seats is Array or saved.seats.size() > 8: continue
 		if typeof(saved.updated) not in [TYPE_INT, TYPE_FLOAT]: continue
-		if Time.get_unix_time_from_system() - saved.updated > 86400: continue
+		if Time.get_unix_time_from_system() - saved.updated > 86400:
+			expired = true
+			continue
 		var valid := true
 		for seat in saved.seats:
 			if not seat is Dictionary or not seat.has_all(["name", "token"]): valid = false; break
@@ -234,3 +237,4 @@ func _restore_rooms() -> void:
 			restored = BurnsGame.new()
 			if not restored.restore(saved.game) or restored.s.players.size() != saved.seats.size(): continue
 		rooms[code] = {"seats": saved.seats, "updated": saved.updated, "game": restored}
+	if expired: _persist_rooms()

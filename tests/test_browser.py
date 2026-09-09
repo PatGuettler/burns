@@ -22,17 +22,22 @@ async def main():
             await page.wait_for_selector('#status', state='detached', timeout=30000)
             await page.wait_for_timeout(500)
             await page.screenshot(path=str(ROOT / f'build/screenshots/browser-menu-{width}-{density}x.png'))
-            # Menu -> pass and play -> deal -> privacy handoff -> table.
-            menu_y = 16 + (height - 32) * .12 + 154 + 24
-            # Inspect the new deck gallery, wrapping from the Ace to the original King.
-            await click(min(200, width / 2), menu_y + 226)
-            await page.wait_for_timeout(200)
-            await click(width / 4, height - 40)
+            # Menu and gallery are driven through the actual canvas hit targets.
+            board_w, board_h = width - 32, height - 32
+            wide = board_w >= 700
+            panel_w = min(400, board_w * .43) if wide else min(420, board_w)
+            panel_x = board_w - panel_w - (24 if wide else (board_w - panel_w) / 2)
+            action_y = (board_h - 282) / 2 if wide else board_h - 282
+            menu_x, menu_y = 16 + panel_x + panel_w / 2, 16 + action_y + 27
+            await click(menu_x, 16 + action_y + 211)
             await page.wait_for_timeout(200)
             await page.screenshot(path=str(ROOT / f'build/screenshots/browser-king-{width}-{density}x.png'))
+            await click(width - 50, 38)
+            await page.wait_for_timeout(200)
+            await page.screenshot(path=str(ROOT / f'build/screenshots/browser-back-{width}-{density}x.png'))
             await click(55, 38)
             await page.wait_for_timeout(200)
-            await click(min(200, width / 2), menu_y)
+            await click(menu_x, menu_y)
             await page.wait_for_timeout(200)
             await click(width / 2, height - 40)
             await page.wait_for_timeout(200)
@@ -44,12 +49,12 @@ async def main():
             # Reveal the hidden top card through the actual card hit target.
             board_w = width - 32
             main_w = board_w - min(310, max(190, board_w * .245)) - 26 if width >= 882 else board_w
-            hand_h = min(150, max(98, (height - 32) * .19))
-            hand_y = height - 32 - 46 - hand_h - 10
-            card_h = hand_h - 40
-            card_w = card_h * .72
-            draw_x = 16 + (main_w - 2 * card_w - 14) / 2 + card_w / 2
-            await click(draw_x, 16 + hand_y + 22 + card_h / 2)
+            hand_h = min(240, max(118, (height - 32) * .27))
+            hand_y = height - 32 - 48 - hand_h - 10
+            card_h = hand_h - 44
+            card_w = card_h / 1.5
+            draw_x = 16 + (main_w - 2 * card_w - min(24, max(10, main_w * .03))) / 2 + card_w / 2
+            await click(draw_x, 16 + hand_y + 24 + card_h / 2)
             await page.wait_for_timeout(200)
             await page.screenshot(path=str(ROOT / f'build/screenshots/browser-revealed-{width}-{density}x.png'))
             # End the turn and exercise the explicit challenge window.

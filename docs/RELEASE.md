@@ -2,17 +2,26 @@
 
 Version: 0.2.0. Engine: Godot 4.7.1. This is a playable development build.
 
+## Mobile polish, September 2026
+
+The current UI has bundled serif/sans fonts, an artwork-led home screen, larger personal cards, smooth suit outlines, hold-to-inspect artwork, a swipeable gallery with suit navigation and card-back viewing, redesigned setup/verdict/victory screens, and native safe-area insets. Supplied Jack and King portraits are preserved unchanged. Ten remaining court portraits are still placeholders and must be supplied before calling the deck final.
+
+Android release exports now run the full automated suite before building an upload artifact. Private-room resynchronization no longer rewrites persistence on stale requests; expired rooms are also removed from persistent storage.
+
 ## Completed checks
 
 - 280 seeded deals across all player counts: uniqueness, conservation, balance, repeatability.
 - Rules scenarios: foundation order, sequence movement, empty rows, bidirectional alternate-color discard play, no rank wrapping, turn ownership, challenge timing, correct/false Burns, ordered penalties, stock exhaustion, deferred victory, and save validation.
 - 35 complete computer games across 2–8 players, checking exact card conservation after each action.
 - UI at 320×568, 390×844, 430×932, 667×375, 844×390, 1120×800, and 1920×1080. Tests assert no visible controls exceed the viewport, no scrolling controls exist, and row cards do not overlap personal cards. A thirteen-card sequence remains selectable through an inspection grid.
+- High-density notch/home-indicator inset calculations, hold-to-inspect and swipe gestures, and unchanged game state after closing the artwork viewer.
 - Native rendered screenshots and real Chromium interaction at phone/desktop sizes, including draw, discard, review, live resizing, and touch input at 3× device pixel density.
 - Real WebSocket room tests including competing claims, reconnection, hidden-card redaction, and restoration after a server restart.
 - Successful single-threaded Web release export and Android debug APK export.
 
 ## Before a production launch
+
+- Supply the ten remaining face-card portraits; the app deliberately retains their placeholders.
 
 - Family playtesting of the documented edge-case choices, including open-pile order, empty opponent discards, optional rearrangements, and priority handling.
 - Physical Android and iPhone/iPad testing: touch targets, density, notches/safe areas, orientation changes, background/resume, audio interruption, and low-memory behavior.
