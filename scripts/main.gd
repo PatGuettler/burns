@@ -198,18 +198,30 @@ func _setup(new_mode: String) -> void:
 	content.add_child(layer)
 	var bounds := _bounds()
 	layer.size = bounds
-	layer.place(_button("‹ Back", _show_menu), Rect2(0, 0, 90, 44))
-	layer.label_at("Gather your table", Rect2(102, 0, bounds.x - 102, 44), 23, GOLD)
-	var introduction := "Take turns on this device." if new_mode == "local" else "You are Player 1. Play against computer opponents."
-	var intro := _paragraph(introduction, 19, CREAM)
-	layer.place(intro, Rect2(0, 64, bounds.x, 52))
-	layer.place(_button("-", func(): player_count = maxi(2, player_count - 1); _setup(new_mode)), Rect2(bounds.x / 2 - 92, 124, 48, 48))
-	var count := layer.label_at(str(player_count), Rect2(bounds.x / 2 - 38, 124, 76, 48), 34, GOLD)
-	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	layer.place(_button("+", func(): player_count = mini(8, player_count + 1); _setup(new_mode)), Rect2(bounds.x / 2 + 44, 124, 48, 48))
-	var description := _paragraph("Aces first, then rows, then opponents’ discards. Drag a card to play, or tap it and its destination. Discard to end your turn; everyone else can call Burns or pass.", 17 if bounds.y > 440 else 14)
-	layer.place(description, Rect2(0, 196, bounds.x, bounds.y - 262))
-	layer.place(_button("Deal a new game", func(): _new_game(new_mode), true), Rect2(0, bounds.y - 48, bounds.x, 48))
+	layer.place(_button("‹ Home", _show_menu), Rect2(0, 0, 88, 44))
+	var title := layer.label_at("PASS & PLAY" if new_mode == "local" else "PLAY COMPUTERS", Rect2(100, 0, bounds.x - 100, 44), 13, GOLD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var compact := bounds.y < 500
+	var header_y := 56.0 if compact else 80.0
+	_heading(layer, "Gather your table", Rect2(0, header_y, bounds.x, 48), 25 if compact else 30, true)
+	var intro := layer.label_at("One device. Everyone gets a turn." if new_mode == "local" else "You play first. Your rivals are ready.", Rect2(0, header_y + 50, bounds.x, 32), 13, MUTED)
+	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var count_y := header_y + 92
+	layer.place(_button("−", func(): player_count = maxi(2, player_count - 1); _setup(new_mode)), Rect2(bounds.x / 2 - 100, count_y + 4, 48, 48))
+	_heading(layer, str(player_count), Rect2(bounds.x / 2 - 40, count_y - 2, 80, 64), 48, true)
+	layer.place(_button("+", func(): player_count = mini(8, player_count + 1); _setup(new_mode)), Rect2(bounds.x / 2 + 52, count_y + 4, 48, 48))
+	var count_label := layer.label_at("PLAYERS  ·  2–8", Rect2(0, count_y + 60, bounds.x, 22), 11, GOLD)
+	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if bounds.y > 550:
+		var art_h := minf(200, bounds.y - count_y - 234)
+		var art := BurnsCardView.new()
+		art.face_down = true
+		art.size = Vector2(art_h / 1.5, art_h)
+		art.position = Vector2((bounds.x - art.size.x) / 2, count_y + 96)
+		layer.add_child(art)
+	var hint := layer.label_at("Aces first. Then rows. Then rivals’ discards.", Rect2(0, bounds.y - 88, bounds.x, 28), 12, MUTED)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.place(_button("Deal the cards", func(): _new_game(new_mode), true), Rect2(0, bounds.y - 52, bounds.x, 52))
 
 func _new_game(new_mode: String) -> void:
 	net.disconnect_room()
@@ -245,6 +257,9 @@ func _can_act() -> bool:
 
 func _show_table() -> void:
 	if state.is_empty(): return
+	if state.phase == "finished":
+		_show_victory()
+		return
 	screen = "game"
 	var actor := _actor()
 	if mode == "local" and state.phase == "turn" and actor != handed_to:
@@ -299,6 +314,7 @@ func _relayout() -> void:
 		"burn_result": _show_burn_result()
 		"burn_caller": _call_burn()
 		"deck_gallery": _show_deck_gallery()
+		"victory": _show_victory()
 		"lobby": _lobby()
 		"online": _online_setup()
 
@@ -580,10 +596,39 @@ func _show_burn_result() -> void:
 	content.add_child(layer)
 	var bounds := _bounds()
 	layer.size = bounds
-	layer.label_at(burn_title, Rect2(0, 12, bounds.x, 56), 34, GOLD)
-	var text := _paragraph(burn_explanation, 21 if bounds.y > 500 else 16, CREAM)
-	layer.place(text, Rect2(0, 88, bounds.x, bounds.y - 160))
-	layer.place(_button("Continue to the table", _show_table, true), Rect2(0, bounds.y - 48, bounds.x, 48))
+	var top := clampf(bounds.y * 0.12, 24, 88)
+	var kicker := layer.label_at("THE TABLE HAS SPOKEN", Rect2(0, top, bounds.x, 26), 11, GOLD)
+	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_heading(layer, burn_title, Rect2(0, top + 32, bounds.x, 50), 27 if bounds.x < 400 else 36, true)
+	var text := _paragraph(burn_explanation, 18 if bounds.y > 500 else 14, CREAM)
+	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.place(text, Rect2(12, top + 104, bounds.x - 24, bounds.y - top - 178))
+	layer.place(_button("Continue to the table", _show_table, true), Rect2(0, bounds.y - 52, bounds.x, 52))
+
+func _show_victory() -> void:
+	screen = "victory"
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := _bounds()
+	layer.size = bounds
+	var compact := bounds.y < 450
+	var top := 20.0 if compact else 54.0
+	var kicker := layer.label_at("EVERY CARD PLAYED", Rect2(0, top, bounds.x, 28), 12, GOLD)
+	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var winner := _heading(layer, state.players[state.winner].name, Rect2(0, top + 38, bounds.x, 60), 38, true)
+	winner.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_heading(layer, "wins the table.", Rect2(0, top + 96, bounds.x, 48), 28, true)
+	if not compact:
+		var art := BurnsCardView.new()
+		art.card_id = 51; art.artwork_only = true
+		var height := minf(bounds.y - top - 286, 280)
+		art.size = Vector2(height / 1.5, height)
+		art.position = Vector2((bounds.x - art.size.x) / 2, top + 160)
+		layer.add_child(art)
+	layer.place(_button("Play again", func(): _setup(mode if mode != "online" else "local"), true), Rect2(0, bounds.y - 104, bounds.x, 48))
+	layer.place(_button("Back to the room", _show_menu), Rect2(0, bounds.y - 48, bounds.x, 44))
 
 func _sync_display_density() -> void:
 	# Canvas dimensions are physical pixels on Retina/high-DPI screens. Layout uses

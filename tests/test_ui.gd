@@ -53,6 +53,11 @@ func run() -> void:
 			scene._show_deck_gallery()
 			await process_frame
 			_validate(scene, viewport_size)
+		scene.state.phase = "finished"
+		scene.state.winner = 0
+		scene._show_victory()
+		await process_frame
+		_validate(scene, viewport_size)
 		scene._show_menu()
 		await process_frame
 		_validate(scene, viewport_size)
