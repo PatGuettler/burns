@@ -314,6 +314,10 @@ export_android() {
 
 	ensure_project_imported
 
+	# A store upload must never be built from a failing game revision.
+	echo "Running rules, layout, drag, and artwork checks before release export..."
+	GODOT="$(command -v godot)" bash "$PROJECT/tools/check.sh"
+
 	local aab_path="$PROJECT/build/android/${ARTIFACT_STEM}.aab"
 	local apk_path="$PROJECT/build/android/${ARTIFACT_STEM}-debug.apk"
 
