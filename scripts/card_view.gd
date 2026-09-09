@@ -1,19 +1,23 @@
 class_name BurnsCardView
 extends Control
-## Engraved raster frames with resolution-independent, font-free suit pips.
+## Original engraved art, fitted portraits, and smooth, font-independent suit pips.
 
 var card_id: int = 0
 var face_down := false
 var empty_slot := false
 var compact := false
+## Portrait inspection never places gameplay indices over the supplied image.
+var artwork_only := false
 var slot_suit := -1
 var slot_text := ""
 var highlighted := false
 var focused := false
 var hovered := false
-const INK := Color("e4e1d9")
-const RED := Color("f18b79")
+const INK := Color("ede9df")
+const RED := Color("f28d7d")
 const COPPER := Color("bd9563")
+const BASE_SIZE := Vector2(76, 114)
+const SUIT_SHAPES := [0, 1, 4, 3]
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -25,115 +29,146 @@ func _draw() -> void:
 	if compact:
 		_draw_compact()
 		return
-	draw_set_transform(Vector2.ZERO, 0, size / Vector2(76, 114))
-	var card_size := Vector2(76, 114)
-	var rect := Rect2(Vector2.ZERO, card_size)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("141919")
-	if empty_slot: style.bg_color = Color(0.08, 0.18, 0.19, 0.32)
-	if hovered and not empty_slot: style.bg_color = style.bg_color.lightened(0.06)
-	style.border_color = Color("ffe1a0") if highlighted or focused else COPPER
-	style.set_border_width_all(3 if highlighted or focused else 1)
-	style.set_corner_radius_all(8)
-	style.shadow_color = Color(0, 0, 0, 0.25)
-	style.shadow_size = 2 if empty_slot else 4
+	draw_set_transform(Vector2.ZERO, 0, size / BASE_SIZE)
+	var rect := Rect2(Vector2.ZERO, BASE_SIZE)
+	var accent := Color("ffe2a9") if highlighted or focused else COPPER
+	if highlighted or focused:
+		var glow := _panel(Color(0.91, 0.7, 0.36, 0.12), Color(0.98, 0.79, 0.43, 0.38), 9, 1)
+		glow.shadow_color = Color(0.91, 0.7, 0.36, 0.2)
+		glow.shadow_size = 5
+		draw_style_box(glow, rect.grow(2))
+	var style := _panel(Color("111719"), accent, 7, 2 if highlighted or focused else 1)
+	if empty_slot:
+		style.bg_color = Color(0.04, 0.11, 0.12, 0.5)
+		style.border_color = Color(accent, 0.64)
+	elif hovered:
+		style.border_color = Color("e2c698")
+	style.shadow_color = Color(0, 0, 0, 0.32)
+	style.shadow_size = 2 if empty_slot else 5
 	style.shadow_offset = Vector2(0, 3)
 	draw_style_box(style, rect)
 	if empty_slot:
-		draw_string(ThemeDB.fallback_font, Vector2(0, 49 if slot_suit >= 0 else 64), slot_text, HORIZONTAL_ALIGNMENT_CENTER, 76, 22, COPPER)
-		if slot_suit >= 0: _draw_suit([0, 1, 4, 3][slot_suit], Vector2(38, 77), 12, COPPER)
+		_draw_empty()
 		return
 	if face_down:
-		_draw_card_texture(BurnsDeckArt.BACK, rect.grow(-2))
+		_draw_card_texture(BurnsDeckArt.BACK, rect.grow(-1.5))
 		return
 	var portrait := BurnsDeckArt.portrait(card_id)
 	if portrait:
-		# Preserve the supplied composition and the person's proportions exactly.
-		var fitted := portrait.get_size() * minf(72.0 / portrait.get_width(), 110.0 / portrait.get_height())
-		draw_texture_rect(portrait, Rect2((card_size - fitted) / 2, fitted), false)
+		# The complete source image stays at its native aspect ratio, including its frame.
+		var fitted := portrait.get_size() * minf(73.0 / portrait.get_width(), 111.0 / portrait.get_height())
+		draw_texture_rect(portrait, Rect2((BASE_SIZE - fitted) / 2, fitted), false)
 	else:
-		_draw_card_texture(BurnsDeckArt.FACE, rect.grow(-2))
+		_draw_card_texture(BurnsDeckArt.FACE, rect.grow(-1.5))
 	var suit := BurnsDeck.suit_of(card_id)
 	var color := RED if suit in BurnsDeck.RED_SUITS else INK
 	var rank := BurnsDeck.rank_of(card_id)
 	if not portrait:
 		if rank <= 10:
+			if rank == 1:
+				draw_arc(Vector2(38, 57), 20.5, 0, TAU, 96, Color(COPPER, 0.7), 0.5, true)
+				draw_arc(Vector2(38, 57), 22, 0.1, PI - 0.1, 48, Color(COPPER, 0.3), 0.5, true)
+				draw_arc(Vector2(38, 57), 22, PI + 0.1, TAU - 0.1, 48, Color(COPPER, 0.3), 0.5, true)
 			for pip in BurnsDeckArt.pip_positions(rank):
-				_draw_suit([0, 1, 4, 3][suit], pip, 16 if rank == 1 else 6.5, color)
+				# The lower half is inverted just like a traditional double-ended deck.
+				_draw_suit(SUIT_SHAPES[suit], pip, 14 if rank == 1 else 6.3, color, pip.y > 57)
 		else:
 			_draw_portrait_placeholder(rank, suit, color)
-	if portrait and size.x >= 160: return # Gallery shows the complete supplied art untouched.
-	# Opaque index gutters keep ranks legible on phones and stacked rows.
+	if portrait and (artwork_only or size.x >= 160): return
+	_draw_indices(color, suit)
+
+func _draw_empty() -> void:
+	var baseline := 49.0 if slot_suit >= 0 else 64.0
+	draw_string(_font(), Vector2(0, baseline), slot_text, HORIZONTAL_ALIGNMENT_CENTER, 76, 22, Color(COPPER, 0.85))
+	if slot_suit >= 0:
+		_draw_suit(SUIT_SHAPES[slot_suit], Vector2(38, 77), 11, Color(COPPER, 0.75))
+
+func _draw_indices(color: Color, suit: int) -> void:
+	# Small rounded index insets leave the engraved frame visible around the card.
 	for flipped in [false, true]:
-		draw_set_transform(size if flipped else Vector2.ZERO, PI if flipped else 0.0, size / card_size)
-		draw_rect(Rect2(3, 3, 18, 34), Color("141919"))
+		draw_set_transform(size if flipped else Vector2.ZERO, PI if flipped else 0.0, size / BASE_SIZE)
+		var inset := _panel(Color("111719"), Color.TRANSPARENT, 3, 0)
+		draw_style_box(inset, Rect2(3, 3, 17, 32))
 		var rank_label := BurnsDeck.rank_text(card_id)
 		var rank_size := 22
-		while ThemeDB.fallback_font.get_string_size(rank_label, HORIZONTAL_ALIGNMENT_LEFT, -1, rank_size).x > 18:
+		while _font().get_string_size(rank_label, HORIZONTAL_ALIGNMENT_LEFT, -1, rank_size).x > 17:
 			rank_size -= 1
-		draw_string(ThemeDB.fallback_font, Vector2(3, 23), rank_label, HORIZONTAL_ALIGNMENT_CENTER, 18, rank_size, color)
-		_draw_suit([0, 1, 4, 3][suit], Vector2(12, 30), 4.7, color)
+		draw_string(_font(), Vector2(3, 23), rank_label, HORIZONTAL_ALIGNMENT_CENTER, 17, rank_size, color)
+		_draw_suit(SUIT_SHAPES[suit], Vector2(11.5, 29.5), 4.6, color)
 
 func _draw_portrait_placeholder(rank: int, suit: int, color: Color) -> void:
-	# Deliberately no invented person: the owner supplies every court portrait.
-	draw_arc(Vector2(38, 54), 19, 0, TAU, 64, COPPER, 0.6, true)
-	var crown := PackedVector2Array([Vector2(25, 44), Vector2(30, 48), Vector2(33, 41), Vector2(38, 47), Vector2(43, 41), Vector2(46, 48), Vector2(51, 44), Vector2(48, 55), Vector2(28, 55)])
-	draw_colored_polygon(crown, COPPER)
-	_draw_suit([0, 1, 4, 3][suit], Vector2(38, 65), 5, color)
+	# A deliberate court seal until the owner supplies the remaining portraits.
+	var center := Vector2(38, 54)
+	draw_arc(center, 20, 0, TAU, 96, Color(COPPER, 0.8), 0.7, true)
+	draw_arc(center, 18.3, 0, TAU, 96, Color(COPPER, 0.3), 0.4, true)
+	var crown := PackedVector2Array([Vector2(25, 44), Vector2(30, 48), Vector2(33, 41), Vector2(38, 47), Vector2(43, 41), Vector2(46, 48), Vector2(51, 44), Vector2(48, 54), Vector2(28, 54)])
+	_fill_smooth(crown, COPPER)
+	draw_line(Vector2(29, 57), Vector2(47, 57), Color(COPPER, 0.8), 0.75, true)
+	for point in [Vector2(25, 43), Vector2(33, 40), Vector2(43, 40), Vector2(51, 43)]:
+		draw_circle(point, 0.9, INK, true, -1, true)
+	_draw_suit(SUIT_SHAPES[suit], Vector2(38, 65), 4.6, color)
 	var title: String = {11: "JACK", 12: "QUEEN", 13: "KING"}[rank]
-	draw_string(ThemeDB.fallback_font, Vector2(0, 86), title, HORIZONTAL_ALIGNMENT_CENTER, 76, 8, color)
-	draw_string(ThemeDB.fallback_font, Vector2(0, 94), "PORTRAIT TO COME", HORIZONTAL_ALIGNMENT_CENTER, 76, 4, COPPER)
+	draw_string(_font(), Vector2(21, 87), title, HORIZONTAL_ALIGNMENT_CENTER, 34, 7, color)
+	if size.x >= 130:
+		draw_string(_font(), Vector2(17, 95), "PORTRAIT TO COME", HORIZONTAL_ALIGNMENT_CENTER, 42, 3, COPPER)
 
-func _draw_suit(suit: int, center: Vector2, radius: float, color: Color) -> void:
-	match suit:
-		0:
-			draw_colored_polygon(PackedVector2Array([center + Vector2(0, -radius), center + Vector2(radius * 0.7, 0), center + Vector2(0, radius), center + Vector2(-radius * 0.7, 0)]), color)
-		1:
-			for offset in [Vector2(0, -0.5), Vector2(-0.48, 0.2), Vector2(0.48, 0.2)]:
-				draw_circle(center + offset * radius, radius * 0.5, color)
-			draw_colored_polygon(PackedVector2Array([center, center + Vector2(-radius * 0.35, radius), center + Vector2(radius * 0.35, radius)]), color)
-		2:
-			draw_circle(center + Vector2(-radius * 0.48, radius * 0.35), radius * 0.46, color)
-			draw_circle(center + Vector2(radius * 0.48, radius * 0.48), radius * 0.46, color)
-			draw_polyline(PackedVector2Array([center + Vector2(-radius * 0.48, radius * 0.2), center + Vector2(radius * 0.18, -radius), center + Vector2(radius * 0.48, radius * 0.2)]), color, maxf(1, radius * 0.09), true)
-		3, 4:
-			var direction := -1.0 if suit == 3 else 1.0
-			draw_circle(center + Vector2(-radius * 0.4, -radius * 0.3 * direction), radius * 0.5, color)
-			draw_circle(center + Vector2(radius * 0.4, -radius * 0.3 * direction), radius * 0.5, color)
-			draw_colored_polygon(PackedVector2Array([center + Vector2(-radius * 0.86, -radius * 0.1 * direction), center + Vector2(radius * 0.86, -radius * 0.1 * direction), center + Vector2(0, radius * direction)]), color)
-			if suit == 3:
-				draw_colored_polygon(PackedVector2Array([center, center + Vector2(-radius * 0.3, radius), center + Vector2(radius * 0.3, radius)]), color)
-		5:
-			draw_rect(Rect2(center - Vector2.ONE * radius * 0.8, Vector2.ONE * radius * 1.6), color, false, maxf(1, radius * 0.12))
-			for offset in [Vector2.ZERO, Vector2(-0.4, -0.4), Vector2(0.4, -0.4), Vector2(-0.4, 0.4), Vector2(0.4, 0.4)]:
-				draw_circle(center + offset * radius, radius * 0.12, color)
+func _draw_suit(suit: int, center: Vector2, radius: float, color: Color, inverted := false) -> void:
+	var rotation := -1.0 if inverted else 1.0
+	var points := BurnsDeckArt.suit_outline(suit)
+	if not points.is_empty():
+		var transformed := PackedVector2Array()
+		for point in points:
+			transformed.append(center + point * radius * rotation)
+		_fill_smooth(transformed, color)
+
+func _fill_smooth(points: PackedVector2Array, color: Color) -> void:
+	draw_colored_polygon(points, color)
+	# Canvas polygons lack edge antialiasing; a matching fine contour smooths them
+	# at phone scale without relying on the viewport's MSAA or font suit glyphs.
+	var contour := points.duplicate()
+	contour.append(points[0])
+	draw_polyline(contour, color, 0.35, true)
 
 func _draw_compact() -> void:
 	draw_set_transform(Vector2.ZERO, 0, size / Vector2(110, 48))
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("172224") if empty_slot else Color("141919")
-	style.set_corner_radius_all(24)
-	style.border_color = COPPER
-	style.set_border_width_all(2 if highlighted or focused else 0)
+	var active := highlighted or focused
+	var style := _panel(Color("122022") if empty_slot else Color("111719"), Color("ffe2a9") if active else Color(COPPER, 0.36), 15, 2 if active else 1)
+	if hovered: style.border_color = COPPER
+	style.shadow_color = Color(0, 0, 0, 0.18)
+	style.shadow_size = 3
+	style.shadow_offset = Vector2(0, 2)
 	draw_style_box(style, Rect2(0, 0, 110, 48))
 	if empty_slot:
-		draw_string(ThemeDB.fallback_font, Vector2(0, 32), "+ / -", HORIZONTAL_ALIGNMENT_CENTER, 110, 20, COPPER)
+		draw_string(_font(), Vector2(0, 31), "—", HORIZONTAL_ALIGNMENT_CENTER, 110, 20, Color(COPPER, 0.7))
 	else:
 		var suit := BurnsDeck.suit_of(card_id)
 		var color := RED if suit in BurnsDeck.RED_SUITS else INK
-		draw_string(ThemeDB.fallback_font, Vector2(23, 33), BurnsDeck.rank_text(card_id), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, color)
-		_draw_suit([0, 1, 4, 3][suit], Vector2(79, 24), 12, color)
+		draw_string(_font(), Vector2(22, 33), BurnsDeck.rank_text(card_id), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, color)
+		_draw_suit(SUIT_SHAPES[suit], Vector2(79, 24), 11, color)
 
 func _draw_card_texture(texture: Texture2D, rect: Rect2) -> void:
-	# Rounded mesh clips the raster's outside corners without changing the source asset.
+	# Rounded mesh clips only the template's white outer corners.
 	var vertices := PackedVector2Array()
 	var uv := PackedVector2Array()
-	var radius := 6.0
+	var radius := 5.5
 	var centers := [rect.position + Vector2(radius, radius), Vector2(rect.end.x - radius, rect.position.y + radius), rect.end - Vector2(radius, radius), Vector2(rect.position.x + radius, rect.end.y - radius)]
 	for corner in range(4):
-		for step in range(9):
-			var angle := PI + corner * PI / 2 + step * PI / 16
+		for step in range(13):
+			var angle := PI + corner * PI / 2 + step * PI / 24
 			var point: Vector2 = centers[corner] + Vector2.from_angle(angle) * radius
 			vertices.append(point)
 			uv.append((point - rect.position) / rect.size)
 	draw_polygon(vertices, PackedColorArray([Color.WHITE]), uv, texture)
+
+func _font() -> Font:
+	return get_theme_font("font", "Label")
+
+func _panel(fill: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = fill
+	panel.border_color = border
+	panel.set_border_width_all(width)
+	panel.set_corner_radius_all(radius)
+	panel.anti_aliasing = true
+	panel.anti_aliasing_size = 0.6
+	return panel
