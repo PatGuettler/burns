@@ -24,6 +24,14 @@ async def main():
             await page.screenshot(path=str(ROOT / f'build/screenshots/browser-menu-{width}-{density}x.png'))
             # Menu -> pass and play -> deal -> privacy handoff -> table.
             menu_y = 16 + (height - 32) * .12 + 154 + 24
+            # Inspect the new deck gallery, wrapping from the Ace to the original King.
+            await click(min(200, width / 2), menu_y + 226)
+            await page.wait_for_timeout(200)
+            await click(width / 4, height - 40)
+            await page.wait_for_timeout(200)
+            await page.screenshot(path=str(ROOT / f'build/screenshots/browser-king-{width}-{density}x.png'))
+            await click(55, 38)
+            await page.wait_for_timeout(200)
             await click(min(200, width / 2), menu_y)
             await page.wait_for_timeout(200)
             await click(width / 2, height - 40)
@@ -56,7 +64,7 @@ async def main():
             assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight'), 'Browser scrollbar overflow'
             await context.close()
         await browser.close()
-    print('PASS: Chromium mouse/touch flow through draw and review, live resize, 1x/3x density, no page scrollbars or script errors')
+    print('PASS: Chromium deck gallery and mouse/touch flow through draw and review, live resize, 1x/3x density, no page scrollbars or script errors')
 
 if __name__ == '__main__':
     class QuietHandler(SimpleHTTPRequestHandler):
