@@ -59,7 +59,7 @@ async def main():
             state = (await receive(host, 'state'))['game']
             await receive(guest, 'state'); await receive(third, 'state')
             assert len(state['players']) == 3
-            assert 'missed' not in state
+            assert 'missed' not in state and 'interrupts' not in state
             for player in state['players']:
                 assert not {'play', 'reserve', 'discard'} & player.keys(), 'Hidden pile leaked'
                 assert player['held'] == -1
@@ -71,7 +71,7 @@ async def main():
             assert state['players'][0]['held'] >= 0
             await send(host, type='action', revision=state['revision']-1, action={'type':'end'})
             assert 'changed' in (await receive(host, 'error'))['message']
-            await receive(host, 'state'); await receive(guest, 'state'); await receive(third, 'state')
+            await receive(host, 'state')
             await send(host, type='action', revision=state['revision'], action={'type':'end'})
             state = (await receive(host, 'state'))['game']
             await receive(guest, 'state'); await receive(third, 'state')

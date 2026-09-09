@@ -118,13 +118,17 @@ func _server_tick() -> void:
 					_broadcast(identity.room)
 	if Time.get_ticks_msec() - last_cleanup > 60000:
 		last_cleanup = Time.get_ticks_msec()
+		var expired := false
 		for code in rooms.keys():
 			var room: Dictionary = rooms[code]
 			if Time.get_unix_time_from_system() - room.updated > 86400:
 				var occupied := false
 				for seat in room.seats:
 					if seat.peer != -1: occupied = true
-				if not occupied: rooms.erase(code)
+				if not occupied:
+					rooms.erase(code)
+					expired = true
+		if expired: _persist_rooms()
 
 func _error(id: int, message: String) -> void:
 	_send(sockets[id].socket, {"type": "error", "message": message})
@@ -172,7 +176,7 @@ func _receive(id: int, msg: Dictionary) -> void:
 	elif msg.get("type") == "action":
 		if room.game == null or not msg.get("action") is Dictionary: return
 		if msg.get("revision", -1) != room.game.s.revision:
-			_error(id, "The table changed. Please try again."); _broadcast(identity.room); return
+			_error(id, "The table changed. Please try again."); _send_state(id, identity.room, identity.seat); return
 		for seat in room.seats:
 			if seat.peer == -1: _error(id, "Play is paused while a player reconnects."); return
 		var error: String = room.game.act(identity.seat, msg.action)
@@ -184,12 +188,15 @@ func _broadcast(code: String) -> void:
 	var room: Dictionary = rooms[code]
 	room.updated = Time.get_unix_time_from_system()
 	_persist_rooms()
-	var seats: Array = room.seats.map(func(p: Dictionary): return {"name": p.name, "connected": p.peer != -1})
 	for i in range(room.seats.size()):
 		var peer: int = room.seats[i].peer
-		if sockets.has(peer):
-			_send(sockets[peer].socket, {"type": "state", "room": code, "seat": i, "seats": seats,
-				"game": room.game.view() if room.game != null else {}})
+		if sockets.has(peer): _send_state(peer, code, i)
+
+func _send_state(peer: int, code: String, seat: int) -> void:
+	var room: Dictionary = rooms[code]
+	var seats: Array = room.seats.map(func(p: Dictionary): return {"name": p.name, "connected": p.peer != -1})
+	_send(sockets[peer].socket, {"type": "state", "room": code, "seat": seat, "seats": seats,
+		"game": room.game.view() if room.game != null else {}})
 
 func _persist_rooms() -> void:
 	var file := ConfigFile.new()

@@ -266,6 +266,7 @@ func view() -> Dictionary:
 	# Even the active client only sees a play card after an explicit draw.
 	var result := s.duplicate(true)
 	result.erase("missed")
+	result.erase("interrupts") # Server-only penalty continuations are not UI state.
 	for p in result.players:
 		p.held_count = 1 if p.held >= 0 else 0
 		p.play_count = p.play.size()
