@@ -4,7 +4,7 @@ Version: 0.2.0. Engine: Godot 4.7.1. This is a playable development build.
 
 ## Mobile polish, September 2026
 
-The current UI has bundled serif/sans fonts, an artwork-led home screen, larger personal cards, smooth suit outlines, hold-to-inspect artwork, a swipeable gallery with suit navigation and card-back viewing, redesigned setup/verdict/victory screens, and native safe-area insets. Supplied Jack and King portraits are preserved unchanged. Ten remaining court portraits are still placeholders and must be supplied before calling the deck final.
+The current UI has bundled serif/sans fonts, an artwork-led home screen, larger personal cards, smooth suit outlines, hold-to-inspect artwork, a swipeable gallery with suit navigation and card-back viewing, redesigned setup/verdict/victory screens, and native safe-area insets. Supplied Jack and King portraits are preserved unchanged. All twelve court cards now carry their own portrait, and every face is baked from art kept under `assets/art/deck/source/`.
 
 Android release exports now run the full automated suite before building an upload artifact. Private-room resynchronization no longer rewrites persistence on stale requests; expired rooms are also removed from persistent storage.
 
@@ -26,8 +26,6 @@ Penalty placement remains under the hidden pile until the conflicting playtest n
 - Successful single-threaded Web release export and Android debug APK export.
 
 ## Before a production launch
-
-- Supply the ten remaining face-card portraits; the app deliberately retains their placeholders.
 
 - Family playtesting of the documented edge-case choices, including open-pile order, empty opponent discards, optional rearrangements, and priority handling.
 - Physical Android and iPhone/iPad testing: touch targets, density, notches/safe areas, orientation changes, background/resume, audio interruption, and low-memory behavior.

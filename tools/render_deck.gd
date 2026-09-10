@@ -21,7 +21,7 @@ func render() -> void:
 		label.position = art.position + Vector2(0, 146)
 		root.add_child(label)
 	var title := Label.new()
-	title.text = "BURNS · THE RAVEN DECK · supplied Jack and King of Spades, ten court portrait placeholders"
+	title.text = "BURNS · THE RAVEN DECK · engraved frame, twelve court portraits, four ace medallions, four suit fields"
 	title.position = Vector2(24, 10)
 	root.add_child(title)
 	await process_frame

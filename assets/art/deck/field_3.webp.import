@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://do1oqm0lclelv"
-path="res://.godot/imported/raven_face.png-d0d48a9de370e292012bd29b6369160d.ctex"
+uid="uid://bhi6l7uk3gq5"
+path="res://.godot/imported/field_3.webp-f0a7b24a483a4a9464367165448ef533.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/deck/raven_face.png"
-dest_files=["res://.godot/imported/raven_face.png-d0d48a9de370e292012bd29b6369160d.ctex"]
+source_file="res://assets/art/deck/field_3.webp"
+dest_files=["res://.godot/imported/field_3.webp-f0a7b24a483a4a9464367165448ef533.ctex"]
 
 [params]
 
@@ -23,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

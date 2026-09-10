@@ -2,7 +2,7 @@
 
 ## Raven deck (current)
 
-See [RAVEN_ART.md](RAVEN_ART.md) for the current card textures, original King of Spades, face-card placeholders, replacement instructions, and exact generation prompts. The new raven room replaces the previous ivory-card backdrop.
+See [RAVEN_ART.md](RAVEN_ART.md) for the current card textures, the baking pipeline, the original King and Jack of Spades, replacement instructions, and exact generation prompts. The new raven room replaces the previous ivory-card backdrop.
 
 ## Standard-deck revision (archived)
 

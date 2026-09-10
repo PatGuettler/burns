@@ -1,28 +1,61 @@
 class_name BurnsDeckArt
 extends RefCounted
-## Full-card portraits are fitted without cropping or changing the supplied image.
-const FACE := preload("res://assets/art/deck/raven_face.png")
-const BACK := preload("res://assets/art/deck/raven_back.png")
-const PORTRAITS := {49: preload("res://assets/art/deck/faces/jack_spades.tres"), 51: preload("res://assets/art/deck/faces/king_spades.jpg")}
+## Faces are baked by tools/bake_deck.py: engraved frame, centrepiece art and title.
+## The two supplied portraits are used whole and are never recomposited or stretched.
+const BACK := preload("res://assets/art/deck/back.webp")
+## Artwork window inside the baked frame, in BurnsCardView.BASE_SIZE units.
+const WINDOW := Rect2(9.3, 9.9, 57.2, 86.7)
+const FIELDS := [
+	preload("res://assets/art/deck/field_0.webp"), preload("res://assets/art/deck/field_1.webp"),
+	preload("res://assets/art/deck/field_2.webp"), preload("res://assets/art/deck/field_3.webp"),
+]
+const ACES := [
+	preload("res://assets/art/deck/ace_0.webp"), preload("res://assets/art/deck/ace_1.webp"),
+	preload("res://assets/art/deck/ace_2.webp"), preload("res://assets/art/deck/ace_3.webp"),
+]
+const COURTS := {
+	10: preload("res://assets/art/deck/court_10.webp"), 11: preload("res://assets/art/deck/court_11.webp"),
+	12: preload("res://assets/art/deck/court_12.webp"), 23: preload("res://assets/art/deck/court_23.webp"),
+	24: preload("res://assets/art/deck/court_24.webp"), 25: preload("res://assets/art/deck/court_25.webp"),
+	36: preload("res://assets/art/deck/court_36.webp"), 37: preload("res://assets/art/deck/court_37.webp"),
+	38: preload("res://assets/art/deck/court_38.webp"), 50: preload("res://assets/art/deck/court_50.webp"),
+}
+const SUPPLIED := {
+	49: preload("res://assets/art/deck/faces/jack_spades.tres"),
+	51: preload("res://assets/art/deck/faces/king_spades.jpg"),
+}
 
-static func portrait(card: int) -> Texture2D:
-	return PORTRAITS.get(card)
+## Complete cards the owner supplied. They carry their own frame, so they are
+## fitted whole at their native aspect instead of filling the card.
+static func supplied(card: int) -> Texture2D:
+	return SUPPLIED.get(card)
+
+## The baked full-bleed face for every other card.
+static func face(card: int) -> Texture2D:
+	if COURTS.has(card):
+		return COURTS[card]
+	var suit := card / 13
+	return ACES[suit] if card % 13 == 0 else FIELDS[suit]
+
+## Pip grid centred on the artwork window rather than on the card.
+const PIP_CENTER := Vector2(37.9, 53.25)
+const PIP_COLUMNS := [25.4, 50.4]
 
 static func pip_positions(rank: int) -> Array[Vector2]:
-	if rank == 1: return [Vector2(38, 57)]
+	if rank == 1: return [PIP_CENTER]
 	var result: Array[Vector2] = []
 	if rank <= 3:
-		result = [Vector2(38, 30), Vector2(38, 84)]
-		if rank == 3: result.append(Vector2(38, 57))
+		result = [Vector2(PIP_CENTER.x, 26.2), Vector2(PIP_CENTER.x, 80.3)]
+		if rank == 3: result.append(PIP_CENTER)
 		return result
-	var ys: Array = [30, 84] if rank <= 5 else ([30, 57, 84] if rank <= 8 else [28, 47, 67, 86])
-	for x in [27, 49]:
+	var ys: Array = [26.2, 80.3] if rank <= 5 else ([26.2, 53.25, 80.3] if rank <= 8 else [24.3, 43.3, 63.2, 82.2])
+	for x in PIP_COLUMNS:
 		for y in ys: result.append(Vector2(x, y))
 	match rank:
-		5, 9: result.append(Vector2(38, 57))
-		7: result.append(Vector2(38, 43))
-		8: result.append_array([Vector2(38, 43), Vector2(38, 71)])
-		10: result.append_array([Vector2(38, 37), Vector2(38, 77)])
+		5, 9: result.append(PIP_CENTER)
+		7: result.append(Vector2(PIP_CENTER.x, 39.7))
+		8: result.append_array([Vector2(PIP_CENTER.x, 39.7), Vector2(PIP_CENTER.x, 66.8)])
+		10: result.append_array([Vector2(PIP_CENTER.x, 33.4), Vector2(PIP_CENTER.x, 73.1)])
 	return result
 
 static var _suit_cache: Dictionary = {}
