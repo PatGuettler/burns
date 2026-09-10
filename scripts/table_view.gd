@@ -12,6 +12,9 @@ const GOLD := Color("d1ac78")
 const MUTED := Color("a7b3ad")
 const CREAM := Color("f4ead6")
 
+static func possessive(name: String) -> String:
+	return "Your" if name == "You" else "%s's" % name
+
 func build(owner_ui: Control, bounds: Vector2) -> void:
 	app = owner_ui
 	state = app.state
@@ -225,7 +228,7 @@ func _opponents(area: Rect2, columns: int) -> void:
 
 func _hand(area: Rect2) -> void:
 	var p: Dictionary = state.players[hand_seat]
-	var title := "%s's hand" % p.name
+	var title := "%s hand" % possessive(p.name)
 	if state.phase == "penalty": title = "%s · choose a penalty card" % p.name
 	_hand_shelf(area)
 	var hand_title := label_at(title, Rect2(area.position, Vector2(area.size.x, 20)), 13, GOLD)
@@ -313,7 +316,7 @@ func _compact_opponent(p: Dictionary, seat: int, area: Rect2) -> void:
 
 func _compact_hand(area: Rect2) -> void:
 	var p: Dictionary = state.players[hand_seat]
-	label_at("%s's hand" % p.name, Rect2(area.position, Vector2(area.size.x, 20)), 13, GOLD)
+	label_at("%s hand" % possessive(p.name), Rect2(area.position, Vector2(area.size.x, 20)), 13, GOLD)
 	var sources := ["play", "discard"]
 	if p.reserve_count > 0: sources.append("reserve")
 	if p.held >= 0: sources.append("held")

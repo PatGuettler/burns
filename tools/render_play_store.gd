@@ -6,8 +6,9 @@ func _init() -> void:
 	_export("ember-raven.png", "res://store/play/icon-512.png", Vector2i(512, 512))
 	_export("ember-raven.png", "res://assets/art/icon.png", Vector2i(1024, 1024))
 	_export("feature.png", "res://store/play/feature-1024x500.png", Vector2i(1024, 500))
-	_export("phone-rivalry.png", "res://store/play/phone-1080x1920.png", Vector2i(1080, 1920))
-	_export("phone-modes.png", "res://store/play/phone-menu-1080x1920.png", Vector2i(1080, 1920))
+	# Promotional panels only. Play screenshot slots take tools/render_store_shots.gd output.
+	_export("phone-rivalry.png", "res://store/play/promo-rivalry-1080x1920.png", Vector2i(1080, 1920))
+	_export("phone-modes.png", "res://store/play/promo-modes-1080x1920.png", Vector2i(1080, 1920))
 	# Keep the full emblem inside Android's adaptive icon safe zone.
 	var foreground := Image.create(432, 432, false, Image.FORMAT_RGB8)
 	foreground.fill(Color("032023"))

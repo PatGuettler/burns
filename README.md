@@ -90,6 +90,13 @@ To render native screenshots:
 godot --path . --audio-driver Dummy --script tests/test_ui.gd -- --screenshots
 ```
 
+The eight Google Play phone screenshots are captures of the running game at
+1080 × 1920, regenerated with:
+
+```sh
+godot --path . --audio-driver Dummy --script tools/render_store_shots.gd
+```
+
 Screenshots and build outputs stay under ignored `build/`. Testing details and remaining release work are in [docs/RELEASE.md](docs/RELEASE.md). Original art provenance and exact image-generation prompts are in [docs/ART.md](docs/ART.md).
 
 The **Explore the deck** menu opens all 52 cards in the raven-and-crown theme. The supplied Noodle King and Jack artwork are the King and Jack of Spades; the ten other court portraits are marked placeholders. Art sources and replacement instructions: [Raven deck art](docs/RAVEN_ART.md).

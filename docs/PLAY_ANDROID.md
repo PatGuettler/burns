@@ -52,10 +52,13 @@ the store listing.
 - [ ] **Contains ads** = No
 - [ ] Privacy policy: host `store/privacy-policy.html` (Burns is paid and ad-free; do not reuse the Unicorn Arcade AdMob policy URL)
 - [ ] Data deletion URL: that same hosted page with `#data-deletion`
-- [ ] Listing images in `store/play/`: `icon-512.png`, `phone-1080x1920.png`, `feature-1024x500.png`
+- [ ] Listing icon and feature graphic in `store/play/`: `icon-512.png`, `feature-1024x500.png`
+- [ ] Phone screenshots: all eight of `store/play/screenshots/*.png`. These are captures of
+      the running game. The `promo-*.png` panels are marketing art and Play rejects them
+      as screenshots; never put them in a screenshot slot.
 - [ ] Website: `https://patguettler.github.io`
 - [ ] Set the one-time price (Play Console → Monetize → App pricing)
-- [ ] Content rating, Data safety, store listing, and screenshots
+- [ ] Content rating, Data safety, and store listing
 - [ ] Internal testing testers list + opt-in
 - [ ] After first CI upload: install from the internal testing link
 
