@@ -138,33 +138,15 @@ func _paragraph(text: String, font_size := 18, color := MUTED) -> Label:
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return label
 
-func _button(text: String, action: Callable, primary := false) -> Button:
-	var button := Button.new()
+## Quiet actions drop the plate entirely: a page where every choice is an
+## identical filled box reads as a default theme rather than a designed screen.
+func _button(text: String, action: Callable, primary := false, quiet := false) -> Button:
+	var button := BurnsPlateButton.new()
+	button.kind = BurnsPlateButton.Kind.PRIMARY if primary else (BurnsPlateButton.Kind.QUIET if quiet else BurnsPlateButton.Kind.PLATE)
 	button.text = text
-	button.clip_text = true
-	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	button.custom_minimum_size = Vector2(maxf(44, UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 24), 44)
-	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_size_override("font_size", 16)
-	button.add_theme_color_override("font_color", CREAM)
-	for key in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color("aa5035") if primary else Color("152a2c")
-		if key == "hover": style.bg_color = style.bg_color.lightened(0.15)
-		if key == "disabled": style.bg_color = Color("253335")
-		style.border_color = GOLD if key == "focus" else (Color("ce8660") if primary else Color("3f5552"))
-		style.set_border_width_all(2 if key == "focus" else 1)
-		style.set_corner_radius_all(16)
-		style.shadow_color = Color(0, 0, 0, 0.2)
-		style.shadow_size = 4
-		style.shadow_offset = Vector2(0, 2)
-		style.content_margin_left = 12
-		style.content_margin_right = 12
-		button.add_theme_stylebox_override(key, style)
 	button.pressed.connect(action)
-	button.add_theme_color_override("font_hover_color", Color.WHITE)
-	button.add_theme_color_override("font_pressed_color", CREAM)
-	button.add_theme_color_override("font_disabled_color", Color("7c8883"))
 	return button
 
 func _flow(parent: Node) -> HFlowContainer:

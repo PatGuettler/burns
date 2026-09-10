@@ -51,14 +51,9 @@ func _drop_data(_at_position: Vector2, data: Variant) -> void:
 		table.app._act(action)
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_DRAG_BEGIN and is_instance_valid(table) and art:
-		var data = get_viewport().gui_get_drag_data()
-		art.highlighted = table.accepts_drop(data, drop_target)
-		art.queue_redraw()
-	elif what == NOTIFICATION_DRAG_END and art and is_instance_valid(table):
-		art.highlighted = not source.is_empty() and source == table.app.selected
-		art.queue_redraw()
-		call_deferred("_release_drag")
+	# Lifting a card used to light every pile that would accept it. Finding the
+	# play is the skill Burns tests, so a drag now reveals nothing about the table.
+	if what == NOTIFICATION_DRAG_END: call_deferred("_release_drag")
 
 func _release_drag() -> void:
 	suppress_click = false

@@ -34,14 +34,14 @@ func build_home(owner_ui: Control, bounds: Vector2) -> void:
 		var arrow := label_at("›", Rect2(x + panel_w - 38, actions_y + i * 62 + 8, 24, 36), 24, GOLD)
 		arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var links_y := actions_y + 190
-	var deck: Button = app._button("Explore the deck", func(): app.gallery_return = "menu"; app.gallery_card = 51; app.gallery_back = false; app._show_deck_gallery())
+	var deck: Button = app._button("Explore the deck", func(): app.gallery_return = "menu"; app.gallery_card = 51; app.gallery_back = false; app._show_deck_gallery(), false, true)
 	deck.name = "ExploreDeck"
 	place(deck, Rect2(x, links_y, panel_w, 42))
 	var extras: Array = [["Rules", app._show_rules], ["Sound on" if app.sound_on else "Sound off", app._toggle_sound]]
 	if app.game or not app.room.is_empty() or FileAccess.file_exists(app.SAVE): extras.push_front(["Resume", app._resume])
 	var width := (panel_w - (extras.size() - 1) * 8) / extras.size()
 	for i in range(extras.size()):
-		place(app._button(extras[i][0], extras[i][1]), Rect2(x + i * (width + 8), links_y + 50, width, 42))
+		place(app._button(extras[i][0], extras[i][1], false, extras[i][0] != "Resume"), Rect2(x + i * (width + 8), links_y + 50, width, 42))
 
 func _fan(area: Rect2) -> void:
 	var h := minf(area.size.y * 0.9, area.size.x * 0.64)

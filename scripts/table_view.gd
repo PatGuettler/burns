@@ -90,7 +90,6 @@ func build(owner_ui: Control, bounds: Vector2) -> void:
 		_burn_banner(Rect2(0, h - footer_h, w, ruling_height - 6))
 	_actions(Rect2(0, h + ruling_height - footer_h, w, footer_h), small)
 	_mark_evidence()
-	_mark_destinations()
 
 func place(control: Control, rect: Rect2) -> Control:
 	control.custom_minimum_size = Vector2.ZERO
@@ -424,10 +423,6 @@ func _opponent_panel(seat: int, area: Rect2) -> void:
 		var label := label_at(caption, Rect2(rect.position.x - 7, rect.end.y, width + 14, 18), 12, MUTED)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-func _mark_destinations() -> void:
-	if app.selected.is_empty() or (state.phase != "turn" and not app._review_turn_ready()) or not app._can_act(): return
-	var data := {"burns_drag": true, "source": app.selected, "revision": state.revision, "table": get_instance_id()}
-	for child in get_children():
-		if child is BurnsCardButton and accepts_drop(data, child.drop_target):
-			child.art.highlighted = true
-			child.art.queue_redraw()
+# Legal destinations are deliberately never lit. Burns punishes the play you
+# failed to see, so pointing at every landing spot would answer the only
+# question the game asks. accepts_drop() still refuses an illegal placement.
