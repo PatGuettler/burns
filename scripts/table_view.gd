@@ -149,14 +149,14 @@ func _card(rect: Rect2, card: int, action: Callable, source := {}, back := false
 func _foundations(area: Rect2) -> void:
 	var gap := clampf(area.size.x * 0.025, 8, 16)
 	var ch := area.size.y - 17
-	var cw := minf(ch / 1.5, (area.size.x - 3 * gap) / 4)
+	var cw := minf(68 if ch < 60 else ch / 1.5, (area.size.x - 3 * gap) / 4)
 	var start := area.position.x + (area.size.x - 4 * cw - 3 * gap) / 2
 	var caption := label_at("01  ·  ACES FIRST", Rect2(area.position.x, area.position.y - 2, area.size.x, 17), 10, GOLD)
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for suit in range(4):
 		var pile: Array = state.foundations[suit]
 		var rect := Rect2(start + suit * (cw + gap), area.position.y + 17, cw, ch)
-		_card(rect, int(pile.back()) if not pile.is_empty() else 0, func(): app._target("foundation", suit), {}, false, pile.is_empty(), "A", suit).drop_target = {"kind": "foundation", "index": suit}
+		_card(rect, int(pile.back()) if not pile.is_empty() else 0, func(): app._target("foundation", suit), {}, false, pile.is_empty(), "A", suit, ch < 60).drop_target = {"kind": "foundation", "index": suit}
 
 func _rows(area: Rect2) -> void:
 	var gap := clampf(area.size.x * 0.022, 5, 22)
@@ -393,7 +393,7 @@ func _mark_evidence() -> void:
 	var evidence: Dictionary = state.get("burn_evidence", {}) if state.phase == "penalty" else {}
 	if evidence.is_empty(): return
 	for child in get_children():
-		if child is BurnsCardButton and child.drop_target.get("kind") == evidence.get("target") and child.drop_target.get("index") == evidence.get("to"):
+		if child is BurnsCardButton and ((child.drop_target.get("kind") == evidence.get("target") and child.drop_target.get("index") == evidence.get("to")) or (not child.art.face_down and not child.art.empty_slot and child.art.card_id == evidence.get("card"))):
 			child.art.highlighted = true
 			child.art.queue_redraw()
 

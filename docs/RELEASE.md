@@ -8,6 +8,12 @@ The current UI has bundled serif/sans fonts, an artwork-led home screen, larger 
 
 Android release exports now run the full automated suite before building an upload artifact. Private-room resynchronization no longer rewrites persistence on stale requests; expired rooms are also removed from persistent storage.
 
+## Playtest follow-up
+
+Burns now names the exact missed destination and stays inline on the board, with the relevant card and destination highlighted. Two-player tables show named opponent draw/discard panels. Computer reveals, plays, and discards animate; the human begins the next turn by drawing or playing instead of a separate Pass tap. Compact pile ranks render without stretching. `test_bot_pacing.gd` verifies reveal motion, the open challenge window, direct turn start, and conservation.
+
+Penalty placement remains under the hidden pile until the conflicting playtest note is confirmed. Larger multiplayer tables still use compact opponent panels.
+
 ## Completed checks
 
 - 280 seeded deals across all player counts: uniqueness, conservation, balance, repeatability.

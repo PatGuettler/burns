@@ -130,21 +130,24 @@ func _fill_smooth(points: PackedVector2Array, color: Color) -> void:
 	draw_polyline(contour, color, 0.35, true)
 
 func _draw_compact() -> void:
-	draw_set_transform(Vector2.ZERO, 0, size / Vector2(110, 48))
+	# Draw in actual logical pixels: stretching a card to a narrow strip ruins its rank.
+	draw_set_transform(Vector2.ZERO)
 	var active := highlighted or focused
-	var style := _panel(Color("122022") if empty_slot else Color("111719"), Color("ffe2a9") if active else Color(COPPER, 0.36), 15, 2 if active else 1)
+	var style := _panel(Color("122022") if empty_slot else Color("111719"), Color("ffe2a9") if active else Color(COPPER, 0.36), int(minf(14, size.y / 2)), 2 if active else 1)
 	if hovered: style.border_color = COPPER
-	style.shadow_color = Color(0, 0, 0, 0.18)
-	style.shadow_size = 3
-	style.shadow_offset = Vector2(0, 2)
-	draw_style_box(style, Rect2(0, 0, 110, 48))
-	if empty_slot:
-		draw_string(_font(), Vector2(0, 31), "—", HORIZONTAL_ALIGNMENT_CENTER, 110, 20, Color(COPPER, 0.7))
+	var width := minf(size.x, maxf(64, size.y * 2.3))
+	var rect := Rect2((size.x - width) / 2, 0, width, size.y)
+	draw_style_box(style, rect)
+	var font_size := int(clampf(size.y * 0.65, 11, 24))
+	var baseline := size.y / 2 + _font().get_ascent(font_size) / 2 - _font().get_descent(font_size) / 2
+	if empty_slot and slot_suit < 0:
+		draw_string(_font(), Vector2(rect.position.x, baseline), "—", HORIZONTAL_ALIGNMENT_CENTER, width, font_size, Color(COPPER, 0.7))
 	else:
-		var suit := BurnsDeck.suit_of(card_id)
-		var color := RED if suit in BurnsDeck.RED_SUITS else INK
-		draw_string(_font(), Vector2(22, 33), BurnsDeck.rank_text(card_id), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, color)
-		_draw_suit(SUIT_SHAPES[suit], Vector2(79, 24), 11, color)
+		var suit := slot_suit if empty_slot else BurnsDeck.suit_of(card_id)
+		var color := COPPER if empty_slot else (RED if suit in BurnsDeck.RED_SUITS else INK)
+		var rank := "A" if empty_slot else BurnsDeck.rank_text(card_id)
+		draw_string(_font(), Vector2(rect.position.x + width * 0.18, baseline), rank, HORIZONTAL_ALIGNMENT_CENTER, width * 0.34, font_size, color)
+		_draw_suit(SUIT_SHAPES[suit], Vector2(rect.position.x + width * 0.73, size.y / 2), minf(10, size.y * 0.27), color)
 
 func _draw_card_texture(texture: Texture2D, rect: Rect2) -> void:
 	# Rounded mesh clips only the template's white outer corners.
