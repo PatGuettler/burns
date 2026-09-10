@@ -5,6 +5,7 @@ const UI_FONT := preload("res://assets/fonts/DejaVuSans.ttf")
 var safe_margins := Vector4(16, 16, 16, 16)
 var background_shade: ColorRect
 var animations_enabled := true
+var active_motion: Control
 const CREAM := Color("f4ead6")
 const MUTED := Color("adc3bd")
 const GOLD := Color("d1ac78")
@@ -93,15 +94,27 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not content or screen != "game" or mode != "bots" or not game: return
+	if is_instance_valid(active_motion) and not active_motion.is_queued_for_deletion(): return
 	bot_wait -= delta
 	if bot_wait > 0: return
 	bot_wait = 0.8
+	if state.phase == "review":
+		for reviewer in state.reviewers:
+			if reviewer > 0:
+				_act(BurnsBot.choose(game, reviewer), reviewer)
+				return
+		if _review_turn_ready(): return
+		if 0 in state.reviewers:
+			_act({"type": "pass"}, 0)
+			return
 	var seat := _actor()
 	if seat > 0:
 		var action := BurnsBot.choose(game, seat)
 		if not action.is_empty(): _act(action, seat)
 
 func _clear() -> void:
+	if is_instance_valid(active_motion): active_motion.queue_free()
+	active_motion = null
 	if background_shade: background_shade.color.a = 0.30 if screen in ["menu", "deck_gallery"] else 0.62
 	if screen != previous_screen:
 		previous_screen = screen
@@ -318,7 +331,7 @@ func _relayout() -> void:
 		"online": _online_setup()
 
 func _select(source: Dictionary) -> void:
-	if not _can_act() or state.phase != "turn": return
+	if not _can_act() or (state.phase != "turn" and not _review_turn_ready()): return
 	selected = source
 	message = "Selected · tap a destination"
 	_show_table()
@@ -334,9 +347,9 @@ func _target(target: String, index: int) -> void:
 	_act(action)
 
 func _pile_action(seat: int, source: String) -> void:
-	if state.phase != "turn" or not _can_act(): return
-	if source == "discard" and seat != state.active: _target("opponent", seat)
-	elif seat == state.active:
+	if (state.phase != "turn" and not _review_turn_ready()) or not _can_act(): return
+	if source == "discard" and seat != _turn_seat(): _target("opponent", seat)
+	elif seat == _turn_seat():
 		if source == "play": _act({"type": "draw"})
 		elif source == "discard" and selected.get("source") == "held": _act({"type": "end"})
 		elif state.players[seat][source + "_count"] > 0: _select({"source": source, "index": seat, "offset": 0})
@@ -361,6 +374,13 @@ func _act(action: Dictionary, seat := -1) -> void:
 		if not (_can_burn() if action.get("type") == "burn" else _can_act()): return
 		net.send_action(action, int(state.revision))
 		return
+	if seat == 0 and _review_turn_ready() and action.get("type") in ["draw", "move", "end"]:
+		game.act(0, {"type": "pass"})
+		state = game.view()
+		if action.get("source") == "discard" and state.players[0].discard_count == 0 and state.players[0].reserve_count > 0:
+			action = action.duplicate()
+			action.source = "reserve"
+	var motion := BurnsCardMotion.capture(self, action, seat)
 	var error := game.act(seat, action)
 	if error.is_empty():
 		selected = {}
@@ -369,11 +389,13 @@ func _act(action: Dictionary, seat := -1) -> void:
 		if action.get("type") == "draw": selected = {"source": "held", "index": 0, "offset": 0}
 		_save()
 		_tone(action.get("type") == "burn")
+		if mode == "bots" and action.get("type") == "end" and seat > 0: bot_wait = 2.5
 	else: message = error
 	if error.is_empty() and action.get("type") == "burn":
 		_prepare_burn_result()
 	else:
 		_show_table()
+		if error.is_empty(): BurnsCardMotion.animate(self, motion)
 
 func _hint() -> void:
 	var available := game.moves().filter(func(m: Dictionary): return not m.optional)
@@ -539,7 +561,7 @@ func _show_rules() -> void:
 		["05 · When the hidden pile runs out", "Your discard becomes an open pile, in the same order. Play its exposed top or reveal its bottom. When you discard again, the remaining open pile becomes face down, without shuffling; its former top is drawn next."],
 		["06 · Call Burns", "BURNS! is available to everyone. A correct call requires a missed play or skipped priority after a turn ends. Early, late, and incorrect calls burn the caller. Every other player gives one card from their hidden top, revealed card, discard top, or open-pile top. Gifts go underneath the burnt player’s hidden pile, in clockwise donor order."],
 		["07 · Win the table", "Get rid of every personal card, including your discard and open pile. Victory is confirmed after the final Burns window and any penalties. You can also win by donating your last card."],
-		["A note about rearranging", "Splitting a row or moving it into an empty row is optional, so endless rearrangements cannot force a Burns. Moving a whole row onto a fitting occupied row frees a space and is required. Unrevealed cards never count as missed plays. Everyone passes explicitly; there is no reaction timer."],
+		["A note about rearranging", "Splitting a row or moving it into an empty row is optional, so endless rearrangements cannot force a Burns. Moving a whole row onto a fitting occupied row frees a space and is required. Unrevealed cards never count as missed plays. Shared-device and online players pass explicitly. Against computers, drawing or playing starts your turn; between computer turns, call Burns during the brief review pause."],
 		["Controls", "Drag a card to its destination, or tap to select and place. Hold a face-up card to inspect its artwork. Tap a row card to move it with everything below. Keyboard: Tab to focus, Enter or Space to select. Offline games save after every action. Sound can be turned off on the home screen."]]
 	var section: Array = sections[rules_page]
 	var layer := BurnsTableView.new()
@@ -756,3 +778,9 @@ func _heading(layer: BurnsTableView, text: String, rect: Rect2, font_size: int, 
 	label.add_theme_font_override("font", DISPLAY_FONT)
 	if centered: label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return label
+
+func _review_turn_ready() -> bool:
+	return mode == "bots" and not state.is_empty() and state.phase == "review" and state.reviewers == [0] and (int(state.active) + 1) % state.players.size() == 0
+
+func _turn_seat() -> int:
+	return 0 if _review_turn_ready() else int(state.active)

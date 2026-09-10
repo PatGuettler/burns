@@ -12,7 +12,7 @@ var inspect_origin := Vector2.ZERO
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
 	inspect_elapsed = -1.0
-	if not draggable or not table.app._can_act() or table.state.phase != "turn": return null
+	if not draggable or not table.app._can_act() or (table.state.phase != "turn" and not table.app._review_turn_ready()): return null
 	var cards := table.drag_cards(source)
 	if cards.is_empty(): return null
 	suppress_click = true

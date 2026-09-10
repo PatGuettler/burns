@@ -1,7 +1,7 @@
 # Polish notes for the next pass
 
 Playtest feedback from Pat, 2026-09-09, with the code locations each item touches.
-Implementation status: items 3 and 7 now land as concrete destination descriptions, priority-sorted evidence, an inline verdict, and destination highlighting. The remaining notes below record the original playtest request.
+Implementation status: items 3 and 7 now land as concrete destination descriptions, priority-sorted evidence, an inline verdict, and destination highlighting. Items 1 and 2 now add direct human turn starts and computer reveal/play/discard animations. Item 6 now gives two-player tables matching named draw/discard panels and highlights available targets when a card is selected. Larger tables retain their compact layouts. Item 4 is pending confirmation because it conflicts with the earlier family rule. The notes below record the original playtest request.
 
 ## 1. Do not make the human tap "Pass" to start their turn
 

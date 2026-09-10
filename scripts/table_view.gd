@@ -35,7 +35,7 @@ func build(owner_ui: Control, bounds: Vector2) -> void:
 	var status := ""
 	match state.phase:
 		"turn": status = "%s · reveal a card or choose a play" % state.players[state.active].name
-		"review": status = "%s · call Burns or pass" % state.players[actor].name
+		"review": status = ("Your turn · draw when ready, or call Burns" if app._review_turn_ready() else ("Call Burns before the next rival draws" if app.mode == "bots" else "%s · call Burns or pass" % state.players[actor].name))
 		"penalty": status = "%s is burnt · %s gives a card" % [state.players[state.burnt].name, state.players[actor].name]
 		"finished": status = "%s wins the table!" % state.players[state.winner].name
 	if not app.message.is_empty(): status = app.message
@@ -75,6 +75,9 @@ func build(owner_ui: Control, bounds: Vector2) -> void:
 		var budget := h - footer_h - 78 - 36 - foundation_h - row_minimum
 		opponent_h = minf(opponent_h, maxf(44, (budget - hand_h) / opponent_rows))
 		hand_h = minf(hand_h, budget - opponent_h * opponent_rows)
+		if others == 1 and budget >= 184:
+			opponent_h = budget / 2
+			hand_h = opponent_h
 		hand_y = h - footer_h - hand_h - 10
 		var opponents_h := opponent_h * opponent_rows
 		_opponents(Rect2(0, 78, w, opponents_h), mini(4, others))
@@ -87,6 +90,7 @@ func build(owner_ui: Control, bounds: Vector2) -> void:
 		_burn_banner(Rect2(0, h - footer_h, w, ruling_height - 6))
 	_actions(Rect2(0, h + ruling_height - footer_h, w, footer_h), small)
 	_mark_evidence()
+	_mark_destinations()
 
 func place(control: Control, rect: Rect2) -> Control:
 	control.custom_minimum_size = Vector2.ZERO
@@ -189,6 +193,7 @@ func _rows(area: Rect2) -> void:
 			place(inspect, Rect2(x, area.position.y, cw, 20))
 
 func _opponents(area: Rect2, columns: int) -> void:
+	if state.players.size() == 2: columns = 1
 	var others: Array[int] = []
 	for seat in range(state.players.size()):
 		if seat != hand_seat: others.append(seat)
@@ -198,6 +203,9 @@ func _opponents(area: Rect2, columns: int) -> void:
 		var seat := others[i]
 		var p: Dictionary = state.players[seat]
 		var origin := area.position + Vector2((i % columns) * cell.x, (i / columns) * cell.y)
+		if state.players.size() == 2 and cell.y >= 92:
+			_opponent_panel(seat, Rect2(origin, cell - Vector2(6, 4)))
+			continue
 		var total := int(p.play_count + p.discard_count + p.reserve_count) + (1 if p.held >= 0 else 0)
 		var label := label_at("%s%s · %d" % ["BURN · " if state.phase == "penalty" and seat == state.burnt else "", p.name, total], Rect2(origin, Vector2(cell.x - 6, 19)), 12, GOLD if seat == state.active else MUTED)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -272,7 +280,12 @@ func _actions(area: Rect2, small: bool) -> void:
 					items.append(["Cancel", func(): app.selected = {}; app._show_table(), false])
 				elif app.mode != "online": items.append(["Hint", app._hint, false])
 			"review":
-				items.append(["Pass", func(): app._act({"type": "pass"}), false])
+				if app._review_turn_ready():
+					var p: Dictionary = state.players[0]
+					if p.play_count > 0: items.append(["Draw card", func(): app._act({"type": "draw"}), true])
+					elif p.reserve_count > 0 or p.discard_count > 0: items.append(["Draw bottom", func(): app._act({"type": "draw", "source": "bottom"}), true])
+					else: items.append(["Continue", func(): app._act({"type": "pass"}), true])
+				elif app.mode != "bots": items.append(["Pass", func(): app._act({"type": "pass"}), false])
 			"penalty":
 				for source in ["play", "discard", "reserve", "held"]:
 					if state.players[app._actor()][source + "_count"] > 0:
@@ -327,14 +340,14 @@ func _compact_hand(area: Rect2) -> void:
 
 func drag_cards(source: Dictionary) -> Array:
 	if not source.has_all(["source", "index", "offset"]): return []
-	var p: Dictionary = state.players[state.active]
+	var p: Dictionary = state.players[app._turn_seat()]
 	match source.source:
 		"row":
 			if source.index < 0 or source.index >= 5: return []
 			return state.rows[source.index].slice(source.offset)
 		"held": return [p.held] if p.held >= 0 else []
 		"discard", "reserve":
-			if source.index != state.active: return []
+			if source.index != app._turn_seat(): return []
 			var top: int = p[source.source + "_top"]
 			return [top] if top >= 0 else []
 	return []
@@ -342,13 +355,13 @@ func drag_cards(source: Dictionary) -> Array:
 func accepts_drop(data: Variant, target: Dictionary) -> bool:
 	if not data is Dictionary or not data.get("burns_drag", false) or target.is_empty(): return false
 	if data.get("table") != get_instance_id() or data.get("revision") != app.state.get("revision"): return false
-	if not app._can_act() or app.state.phase != "turn": return false
+	if not app._can_act() or (app.state.phase != "turn" and not app._review_turn_ready()): return false
 	var source: Dictionary = data.source
 	var cards := drag_cards(source)
 	if cards.is_empty(): return false
 	var card: int = cards[0]
 	match target.kind:
-		"discard": return source.source == "held" and target.index == state.active
+		"discard": return source.source == "held" and target.index == app._turn_seat()
 		"foundation":
 			return cards.size() == 1 and BurnsDeck.suit_of(card) == target.index and state.foundations[target.index].size() == BurnsDeck.rank_of(card) - 1
 		"row":
@@ -356,7 +369,7 @@ func accepts_drop(data: Variant, target: Dictionary) -> bool:
 			var pile: Array = state.rows[target.index]
 			return pile.is_empty() or (BurnsGame.alternate(card, pile.back()) and BurnsDeck.rank_of(pile.back()) == BurnsDeck.rank_of(card) + 1)
 		"opponent":
-			if source.source == "row" or cards.size() != 1 or target.index == state.active: return false
+			if source.source == "row" or cards.size() != 1 or target.index == app._turn_seat(): return false
 			var top: int = state.players[target.index].discard_top
 			return top >= 0 and (BurnsGame.alternate(card, top) and absi(BurnsDeck.rank_of(card) - BurnsDeck.rank_of(top)) == 1)
 	return false
@@ -381,5 +394,40 @@ func _mark_evidence() -> void:
 	if evidence.is_empty(): return
 	for child in get_children():
 		if child is BurnsCardButton and child.drop_target.get("kind") == evidence.get("target") and child.drop_target.get("index") == evidence.get("to"):
+			child.art.highlighted = true
+			child.art.queue_redraw()
+
+func _opponent_panel(seat: int, area: Rect2) -> void:
+	var p: Dictionary = state.players[seat]
+	_hand_shelf(area)
+	var title := label_at(("BURN · " if state.phase == "penalty" and seat == state.burnt else "") + p.name, Rect2(area.position, Vector2(area.size.x, 20)), 13, GOLD if seat == state.active else MUTED)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var piles := ["play", "discard"]
+	if p.reserve_top >= 0: piles.append("reserve")
+	if p.held >= 0: piles.append("held")
+	var gap := clampf(area.size.x * 0.03, 10, 24)
+	var height := area.size.y - 44
+	var width := minf(height / 1.5, (area.size.x - 16 - (piles.size() - 1) * gap) / piles.size())
+	height = width * 1.5
+	var start := area.position.x + (area.size.x - piles.size() * width - (piles.size() - 1) * gap) / 2
+	for i in range(piles.size()):
+		var kind: String = piles[i]
+		var card: int = p.held if kind == "held" else (p.get(kind + "_top", -1))
+		var back: bool = kind == "play" and p.play_count > 0
+		var rect := Rect2(start + i * (width + gap), area.position.y + 24, width, height)
+		var button := _card(rect, card, func():
+			if kind == "discard": app._pile_action(seat, kind)
+			elif card >= 0: app._inspect_card(card), {}, back, not back and card < 0, "—")
+		button.set_meta("pile", {"source": kind, "index": seat})
+		if kind == "discard": button.drop_target = {"kind": "opponent", "index": seat}
+		var caption: String = {"play": "Draw · %d" % p.play_count, "discard": "Discard", "reserve": "Open top", "held": "Revealed"}[kind]
+		var label := label_at(caption, Rect2(rect.position.x - 7, rect.end.y, width + 14, 18), 12, MUTED)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+func _mark_destinations() -> void:
+	if app.selected.is_empty() or (state.phase != "turn" and not app._review_turn_ready()) or not app._can_act(): return
+	var data := {"burns_drag": true, "source": app.selected, "revision": state.revision, "table": get_instance_id()}
+	for child in get_children():
+		if child is BurnsCardButton and accepts_drop(data, child.drop_target):
 			child.art.highlighted = true
 			child.art.queue_redraw()
