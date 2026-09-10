@@ -46,6 +46,8 @@ func build(owner_ui: Control, bounds: Vector2) -> void:
 	var status_label := label_at(status, Rect2(0, 44, w, 26), 15, CREAM)
 	status_label.tooltip_text = status
 	var footer_h := 48.0
+	var ruling_height := 68.0 if state.phase == "penalty" else 0.0
+	h -= ruling_height
 	var hand_h := clampf(h * 0.27, 118, 240)
 	var hand_y := h - footer_h - hand_h - 10
 	var main_w := w
@@ -81,7 +83,10 @@ func build(owner_ui: Control, bounds: Vector2) -> void:
 		var rows_y := foundation_y + foundation_h + 14
 		_rows(Rect2(0, rows_y, w, maxf(65, hand_y - rows_y - 12)))
 	if not (wide and small): _hand(Rect2(0, hand_y, main_w, hand_h))
-	_actions(Rect2(0, h - footer_h, w, footer_h), small)
+	if ruling_height > 0:
+		_burn_banner(Rect2(0, h - footer_h, w, ruling_height - 6))
+	_actions(Rect2(0, h + ruling_height - footer_h, w, footer_h), small)
+	_mark_evidence()
 
 func place(control: Control, rect: Rect2) -> Control:
 	control.custom_minimum_size = Vector2.ZERO
@@ -194,7 +199,7 @@ func _opponents(area: Rect2, columns: int) -> void:
 		var p: Dictionary = state.players[seat]
 		var origin := area.position + Vector2((i % columns) * cell.x, (i / columns) * cell.y)
 		var total := int(p.play_count + p.discard_count + p.reserve_count) + (1 if p.held >= 0 else 0)
-		var label := label_at("%s · %d" % [p.name, total], Rect2(origin, Vector2(cell.x - 6, 19)), 12, GOLD if seat == state.active else MUTED)
+		var label := label_at("%s%s · %d" % ["BURN · " if state.phase == "penalty" and seat == state.burnt else "", p.name, total], Rect2(origin, Vector2(cell.x - 6, 19)), 12, GOLD if seat == state.active else MUTED)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.tooltip_text = "%s: %d hidden, %d discarded, %d open" % [p.name, p.play_count, p.discard_count, p.reserve_count]
 		if cell.y < 86:
@@ -355,3 +360,26 @@ func accepts_drop(data: Variant, target: Dictionary) -> bool:
 			var top: int = state.players[target.index].discard_top
 			return top >= 0 and (BurnsGame.alternate(card, top) and absi(BurnsDeck.rank_of(card) - BurnsDeck.rank_of(top)) == 1)
 	return false
+
+func _burn_banner(area: Rect2) -> void:
+	var panel := Panel.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("34231f")
+	style.border_color = Color("c87b51")
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(12)
+	panel.add_theme_stylebox_override("panel", style)
+	place(panel, area)
+	var title := "BURNS · " if state.get("burn_correct", false) else "FALSE CALL · "
+	var body := label_at(title + str(state.get("burn_message", "Penalty cards are due.")), Rect2(area.position + Vector2(10, 4), area.size - Vector2(20, 8)), 11 if area.size.x < 600 else 14, CREAM)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.tooltip_text = body.text
+
+func _mark_evidence() -> void:
+	var evidence: Dictionary = state.get("burn_evidence", {}) if state.phase == "penalty" else {}
+	if evidence.is_empty(): return
+	for child in get_children():
+		if child is BurnsCardButton and child.drop_target.get("kind") == evidence.get("target") and child.drop_target.get("index") == evidence.get("to"):
+			child.art.highlighted = true
+			child.art.queue_redraw()

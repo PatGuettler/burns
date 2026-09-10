@@ -80,7 +80,7 @@ func _init() -> void:
 	g = BurnsGame.new()
 	g.start(["A", "B"], 10)
 	var v := g.view()
-	check(not v.has("missed"), "Adjudication evidence stays private until a challenge")
+	check(not v.has("missed") and not v.has("missed_move"), "Adjudication evidence stays private until a challenge")
 	for p in v.players:
 		check(not p.has("play") and not p.has("reserve") and not p.has("discard"), "No hidden arrays in client snapshots")
 	check(g.invariant(), "Initial deck conservation")
@@ -106,6 +106,8 @@ func _init() -> void:
 	g.s.players[1].discard = [3]
 	check(g.act(0, {"type": "end"}) == "", "End turn with an occupied playable opponent discard")
 	check(g.act(1, {"type": "burn"}) == "" and g.s.burnt == 0, "Missing a real discard play still burns the offender")
+	check(g.s.burn_message.contains("B's discard (4 of Diamonds)"), "Verdict identifies the opponent and the exact card")
+	check(g.view().burn_evidence.target == "opponent" and g.view().burn_evidence.to == 1, "Confirmed challenge publishes its destination for highlighting")
 	g = BurnsGame.new()
 	g.start(["A", "B", "C"], 42)
 	check(g.act(0, {"type": "draw"}) == "", "Reveal before an early call")

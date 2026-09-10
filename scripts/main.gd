@@ -311,7 +311,6 @@ func _relayout() -> void:
 		"rules": _show_rules()
 		"setup": _setup(setup_mode)
 		"row": _inspect_row(row_inspection)
-		"burn_result": _show_burn_result()
 		"burn_caller": _call_burn()
 		"deck_gallery": _show_deck_gallery()
 		"victory": _show_victory()
@@ -479,7 +478,6 @@ func _online_setup() -> void:
 
 func _online_state(snapshot: Dictionary) -> void:
 	var previous_burn: int = state.get("burn_serial", 0)
-	var keep_result := screen == "burn_result"
 	var keep_gallery := screen == "deck_gallery" and gallery_return == "game"
 	room = snapshot
 	local_seat = int(snapshot.seat)
@@ -490,7 +488,6 @@ func _online_state(snapshot: Dictionary) -> void:
 	message = ""
 	if state.is_empty(): _lobby()
 	elif int(state.get("burn_serial", 0)) > previous_burn: _prepare_burn_result()
-	elif keep_result: _show_burn_result()
 	elif keep_gallery: _show_deck_gallery()
 	else: _show_table()
 
@@ -584,26 +581,14 @@ func _style_input(field: LineEdit) -> void:
 		field.add_theme_stylebox_override(key, style)
 
 func _prepare_burn_result() -> void:
-	burn_title = "Burns confirmed" if state.get("burn_correct", state.burnt == state.active) else "False call"
-	burn_explanation = "\n\n".join(PackedStringArray(state.log.slice(maxi(0, state.log.size() - 2))))
-	_show_burn_result()
+	burn_title = "Burns confirmed" if state.get("burn_correct", false) else "False call"
+	burn_explanation = state.get("burn_message", "")
+	bot_wait = 2.5
+	_show_table()
 
 func _show_burn_result() -> void:
-	screen = "burn_result"
-	_clear()
-	var layer := BurnsTableView.new()
-	layer.app = self
-	content.add_child(layer)
-	var bounds := _bounds()
-	layer.size = bounds
-	var top := clampf(bounds.y * 0.12, 24, 88)
-	var kicker := layer.label_at("THE TABLE HAS SPOKEN", Rect2(0, top, bounds.x, 26), 11, GOLD)
-	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_heading(layer, burn_title, Rect2(0, top + 32, bounds.x, 50), 27 if bounds.x < 400 else 36, true)
-	var text := _paragraph(burn_explanation, 18 if bounds.y > 500 else 14, CREAM)
-	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	layer.place(text, Rect2(12, top + 104, bounds.x - 24, bounds.y - top - 178))
-	layer.place(_button("Continue to the table", _show_table, true), Rect2(0, bounds.y - 52, bounds.x, 52))
+	# Compatibility for callers restoring an older UI state: adjudication stays on the board.
+	_show_table()
 
 func _show_victory() -> void:
 	screen = "victory"

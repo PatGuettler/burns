@@ -80,7 +80,17 @@ func _move(source: Dictionary, kind: String, index: int, priority: int) -> Dicti
 		"optional": source.kind == "row" and kind == "row" and (source.offset > 0 or s.rows[index].is_empty())}
 
 func describe(move: Dictionary) -> String:
-	var place: String = {"foundation": "the Aces area", "row": "row %d" % (move.to + 1), "opponent": "another player's discard"}[move.target]
+	var place := ""
+	match move.target:
+		"foundation": place = "the %s Ace pile" % BurnsDeck.SUITS[move.to]
+		"row":
+			var row: Array = s.rows[move.to]
+			place = "row %d" % (move.to + 1)
+			if not row.is_empty(): place += ", onto the " + BurnsDeck.card_name(row.back())
+		"opponent":
+			var player: Dictionary = s.players[move.to]
+			place = "%s's discard" % player.name
+			if not player.discard.is_empty(): place += " (" + BurnsDeck.card_name(player.discard.back()) + ")"
 	return "%s could play to %s." % [BurnsDeck.card_name(move.card), place]
 
 func act(seat: int, action: Dictionary) -> String:
@@ -137,6 +147,7 @@ func _play(action: Dictionary) -> String:
 		for move in legal:
 			if move.priority == best:
 				s.missed = "A higher-priority play was skipped. " + describe(move)
+				s.missed_move = move.duplicate()
 				break
 	var p: Dictionary = s.players[s.active]
 	var cards: Array = []
@@ -162,8 +173,10 @@ func _end() -> String:
 	if p.held == -1 and not p.play.is_empty():
 		return "Reveal a card, then play it or discard it to end your turn."
 	var available := moves().filter(func(m: Dictionary): return not m.optional)
+	available.sort_custom(func(a: Dictionary, b: Dictionary): return a.priority < b.priority)
 	if not available.is_empty() and s.missed.is_empty():
 		s.missed = describe(available[0])
+		s.missed_move = available[0].duplicate()
 	var discarded := -1
 	if p.held >= 0:
 		discarded = p.held
@@ -205,9 +218,11 @@ func _burn(seat: int) -> String:
 		s.interrupts.append({"phase": s.phase, "burnt": s.burnt, "donors": s.donors.duplicate(), "reviewers": s.reviewers.duplicate()})
 	s.burn_serial = int(s.get("burn_serial", 0)) + 1
 	s.burn_correct = correct
+	s.burn_evidence = s.get("missed_move", {}).duplicate() if correct else {}
 	s.burnt = s.active if correct else seat
 	var reason: String = s.missed if correct else ("False call: no playable move was missed." if eligible else "False call: this is not an eligible end-of-turn challenge.")
-	_log("%s called Burns. %s" % [s.players[seat].name, reason])
+	s.burn_message = "%s called Burns. %s" % [s.players[seat].name, reason]
+	_log(s.burn_message)
 	_log("%s receives one card from each other player." % s.players[s.burnt].name)
 	s.donors = []
 	for offset in range(1, s.players.size()):
@@ -257,6 +272,7 @@ func _next_turn() -> void:
 	s.turn += 1
 	s.phase = "turn"
 	s.missed = ""
+	s.erase("missed_move")
 	s.burnt = -1
 	s.turn_moves = 0
 	_normalize()
@@ -266,6 +282,7 @@ func view() -> Dictionary:
 	# Even the active client only sees a play card after an explicit draw.
 	var result := s.duplicate(true)
 	result.erase("missed")
+	result.erase("missed_move")
 	result.erase("interrupts") # Server-only penalty continuations are not UI state.
 	for p in result.players:
 		p.held_count = 1 if p.held >= 0 else 0

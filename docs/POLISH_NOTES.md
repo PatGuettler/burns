@@ -1,7 +1,7 @@
 # Polish notes for the next pass
 
 Playtest feedback from Pat, 2026-09-09, with the code locations each item touches.
-Nothing in this file is implemented yet — it is the queue.
+Implementation status: items 3 and 7 now land as concrete destination descriptions, priority-sorted evidence, an inline verdict, and destination highlighting. The remaining notes below record the original playtest request.
 
 ## 1. Do not make the human tap "Pass" to start their turn
 
