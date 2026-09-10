@@ -1,6 +1,2 @@
-extends SceneTree
-func _init() -> void:
-	var icon := Image.load_from_file("res://assets/art/icon.svg")
-	assert(not icon.is_empty())
-	assert(icon.save_png("res://assets/art/icon.png") == OK)
-	quit()
+extends "res://tools/render_play_store.gd"
+## Compatibility entry point; the approved raster master owns the app identity.
