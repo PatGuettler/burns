@@ -112,6 +112,27 @@ func _process(delta: float) -> void:
 		var action := BurnsBot.choose(game, seat)
 		if not action.is_empty(): _act(action, seat)
 
+## Android delivers Back and app suspension as notifications. Without these the
+## engine closed the app from any screen, abandoning the turn in progress, and a
+## table could be killed by the OS between actions without reaching disk.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST: _go_back()
+	elif what == NOTIFICATION_APPLICATION_PAUSED: _save()
+
+## Back retraces whatever route the screen's own back control offers, so the
+## gesture and the button never disagree. Only Home leaves the app.
+func _go_back() -> void:
+	if not content: return
+	match screen:
+		"menu": get_tree().quit()
+		"row", "burn_caller": _show_table()
+		"confirm_deal": _setup(setup_mode)
+		"deck_gallery": _close_gallery()
+		"rules":
+			if state.is_empty(): _show_menu()
+			else: _show_table()
+		_: _show_menu()
+
 func _clear() -> void:
 	if is_instance_valid(active_motion): active_motion.queue_free()
 	active_motion = null
@@ -216,7 +237,42 @@ func _setup(new_mode: String) -> void:
 		layer.add_child(art)
 	var hint := layer.label_at("Aces first. Then rows. Then rivals’ discards.", Rect2(0, bounds.y - 88, bounds.x, 28), 12, MUTED)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	layer.place(_button("Deal the cards", func(): _new_game(new_mode), true), Rect2(0, bounds.y - 52, bounds.x, 52))
+	layer.place(_button("Deal the cards", func(): _deal(new_mode), true), Rect2(0, bounds.y - 52, bounds.x, 52))
+
+## There is one offline save slot, and dealing overwrites it. An unfinished
+## table has to be given up on purpose rather than by tapping through setup.
+func _deal(new_mode: String) -> void:
+	if save_enabled and FileAccess.file_exists(SAVE): _confirm_deal(new_mode)
+	else: _new_game(new_mode)
+
+func _confirm_deal(new_mode: String) -> void:
+	screen = "confirm_deal"
+	_clear()
+	var layer := BurnsTableView.new()
+	layer.app = self
+	content.add_child(layer)
+	var bounds := _bounds()
+	layer.size = bounds
+	layer.place(_button("‹ Back", func(): _setup(new_mode)), Rect2(0, 0, 90, 44))
+	var compact := bounds.y < 500
+	_heading(layer, "Replace your table?", Rect2(0, 64 if compact else 112, bounds.x, 48), 26 if compact else 30, true)
+	var body := layer.label_at("A table is already saved. Dealing a new one gives it up for good.", Rect2(0, (114 if compact else 166), bounds.x, 64), 15, MUTED)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	# Portrait leaves a hole between the question and the answers; the deck back
+	# fills it the same way the setup screen does, and landscape simply skips it.
+	var art_top := (114 if compact else 166) + 72
+	var art_h := minf(200, bounds.y - 118 - art_top)
+	if art_h > 90:
+		var art := BurnsCardView.new()
+		art.face_down = true
+		art.size = Vector2(art_h / 1.5, art_h)
+		art.position = Vector2((bounds.x - art.size.x) / 2, art_top + (bounds.y - 118 - art_top - art_h) / 2)
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(art)
+	layer.place(_button("Resume the saved table", _resume), Rect2(0, bounds.y - 106, bounds.x, 48))
+	layer.place(_button("Deal a new table", func(): _new_game(new_mode), true), Rect2(0, bounds.y - 52, bounds.x, 52))
 
 func _new_game(new_mode: String) -> void:
 	net.disconnect_room()

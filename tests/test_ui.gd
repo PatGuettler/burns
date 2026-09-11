@@ -69,6 +69,9 @@ func run() -> void:
 			scene._setup(game_mode)
 			await process_frame
 			_validate(scene, viewport_size)
+		scene._confirm_deal("local")
+		await process_frame
+		_validate(scene, viewport_size)
 		scene._online_setup()
 		await process_frame
 		_validate(scene, viewport_size)
@@ -96,6 +99,43 @@ func run() -> void:
 			await RenderingServer.frame_post_draw
 			DirAccess.make_dir_recursive_absolute("res://build/screenshots")
 			root.get_texture().get_image().save_png("res://build/screenshots/table-%dx%d.png" % [viewport_size.x, viewport_size.y])
+	# Android's Back gesture must retrace the screen it is on, never close the table.
+	scene.player_count = 4
+	scene._new_game("local")
+	scene.handed_to = 0
+	scene._show_table()
+	await process_frame
+	scene._inspect_row(0)
+	await process_frame
+	scene._go_back()
+	await process_frame
+	check(scene.screen == "game", "Back leaves row inspection for the table")
+	scene.gallery_return = "game"
+	scene._show_deck_gallery()
+	await process_frame
+	scene._go_back()
+	await process_frame
+	check(scene.screen == "game", "Back closes the deck gallery onto the table")
+	scene._show_rules()
+	await process_frame
+	scene._go_back()
+	await process_frame
+	check(scene.screen == "game", "Back leaves the rules for the table in progress")
+	scene._call_burn()
+	await process_frame
+	scene._go_back()
+	await process_frame
+	check(scene.screen == "game", "Back cancels the Burns caller")
+	scene._setup("local")
+	await process_frame
+	scene._go_back()
+	await process_frame
+	check(scene.screen == "menu", "Back leaves setup for home")
+	scene._online_setup()
+	await process_frame
+	scene._go_back()
+	await process_frame
+	check(scene.screen == "menu", "Back leaves the online form for home")
 	print("PASS: %d UI bounds, no-scrollbar, sequence selection, and reveal checks at seven phone/desktop sizes" % checks)
 	quit()
 
