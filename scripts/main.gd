@@ -277,7 +277,14 @@ func _inspect_row(row: int) -> void:
 	var bounds := _bounds()
 	layer.size = bounds
 	layer.place(_button("‹ Table", _show_table), Rect2(0, 0, 110, 44))
-	layer.label_at("Row %d · choose a sequence" % (row + 1), Rect2(118, 0, bounds.x - 118, 44), 18, GOLD)
+	# The back button leaves barely half the header on a 320-point phone. The wording
+	# stays fixed so rotating the device never rewrites it, and the size gives way instead.
+	var header := Rect2(118, 0, bounds.x - 118, 44)
+	var title := "Row %d · tap a card" % (row + 1)
+	var title_size := 18
+	while title_size > 12 and UI_FONT.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x > header.size.x:
+		title_size -= 1
+	layer.label_at(title, header, title_size, GOLD)
 	var pile: Array = state.rows[row]
 	var columns := 4 if bounds.x < 600 else 7
 	var rows := maxi(1, int(ceil(float(pile.size()) / columns)))
@@ -617,7 +624,7 @@ func _show_victory() -> void:
 		art.position = Vector2((bounds.x - art.size.x) / 2, top + 160)
 		layer.add_child(art)
 	layer.place(_button("Play again", func(): _setup(mode if mode != "online" else "local"), true), Rect2(0, bounds.y - 104, bounds.x, 48))
-	layer.place(_button("Back to the room", _show_menu), Rect2(0, bounds.y - 48, bounds.x, 44))
+	layer.place(_button("Home", _show_menu), Rect2(0, bounds.y - 48, bounds.x, 44))
 
 func _sync_display_density() -> void:
 	# Canvas dimensions are physical pixels on Retina/high-DPI screens. Layout uses

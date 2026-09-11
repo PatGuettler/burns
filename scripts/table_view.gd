@@ -292,7 +292,9 @@ func _actions(area: Rect2, small: bool) -> void:
 				for source in ["play", "discard", "reserve", "held"]:
 					if state.players[app._actor()][source + "_count"] > 0:
 						items.append(["Give " + {"play": "hidden", "discard": "discard", "reserve": "open", "held": "revealed"}[source], func(): app._act({"type": "donate", "source": source}), true])
-	if state.phase == "finished": items.append(["Back to the room", app._show_menu, true])
+	# This leaves for the home screen in every mode, including online, so it must not
+	# promise a room. An online seat is still held and returns through Resume.
+	if state.phase == "finished": items.append(["Home", app._show_menu, true])
 	if app.mode == "online" and not app.net.connected: items = [["Reconnect", app._reconnect, true]]
 	if items.is_empty():
 		label_at("Watching the table…", area, 15, MUTED)
